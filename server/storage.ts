@@ -19,7 +19,7 @@ import {
   projects
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // User methods (kept from original)
@@ -45,6 +45,8 @@ export interface IStorage {
   // Log methods
   getLogs(): Promise<Log[]>;
   getLogsByAgent(agentId: number): Promise<Log[]>;
+  getLogsByProject(projectId: number): Promise<Log[]>;
+  getConversationLogs(projectId?: number): Promise<Log[]>;
   createLog(log: InsertLog): Promise<Log>;
   
   // Issue methods
@@ -411,6 +413,33 @@ export class MemStorage implements IStorage {
       });
   }
 
+  async getLogsByProject(projectId: number): Promise<Log[]> {
+    return Array.from(this.logs.values())
+      .filter(log => log.projectId === projectId)
+      .sort((a, b) => {
+        // Safely handle null timestamps by defaulting to current time
+        const timeA = a.timestamp ? a.timestamp.getTime() : Date.now();
+        const timeB = b.timestamp ? b.timestamp.getTime() : Date.now();
+        return timeB - timeA;
+      });
+  }
+
+  async getConversationLogs(projectId?: number): Promise<Log[]> {
+    let logs = Array.from(this.logs.values())
+      .filter(log => log.type === 'conversation');
+    
+    // If projectId is provided, filter by project
+    if (projectId !== undefined) {
+      logs = logs.filter(log => log.projectId === projectId);
+    }
+    
+    return logs.sort((a, b) => {
+      const timeA = a.timestamp ? a.timestamp.getTime() : Date.now();
+      const timeB = b.timestamp ? b.timestamp.getTime() : Date.now();
+      return timeB - timeA;
+    });
+  }
+
   async createLog(insertLog: InsertLog): Promise<Log> {
     const id = this.currentLogId++;
     const timestamp = new Date();
@@ -420,6 +449,8 @@ export class MemStorage implements IStorage {
       timestamp,
       type: insertLog.type || 'info',
       agentId: insertLog.agentId || null,
+      projectId: insertLog.projectId || null,
+      targetAgentId: insertLog.targetAgentId || null,
       details: insertLog.details || null
     };
     this.logs.set(id, log);
@@ -706,6 +737,43 @@ export class DatabaseStorage implements IStorage {
       .where(eq(logs.agentId, agentId))
       .orderBy((logs) => desc(logs.timestamp));
   }
+  
+  async getLogsByProject(projectId: number): Promise<Log[]> {
+    return db.select()
+      .from(logs)
+      .where(eq(logs.projectId, projectId))
+      .orderBy((logs) => desc(logs.timestamp));
+  }
+  
+  async getConversationLogs(projectId?: number): Promise<Log[]> {
+    // Use a simple conditional without chaining syntax
+    if (projectId !== undefined) {
+      // If projectId is provided, filter by both type and projectId
+      const result = await db.select()
+        .from(logs)
+        .where(eq(logs.type, 'conversation'))
+        .where(eq(logs.projectId, projectId));
+      
+      // Sort the results manually
+      return result.sort((a, b) => {
+        const timeA = a.timestamp ? a.timestamp.getTime() : Date.now();
+        const timeB = b.timestamp ? b.timestamp.getTime() : Date.now();
+        return timeB - timeA;
+      });
+    } else {
+      // Otherwise just filter by type
+      const result = await db.select()
+        .from(logs)
+        .where(eq(logs.type, 'conversation'));
+      
+      // Sort the results manually
+      return result.sort((a, b) => {
+        const timeA = a.timestamp ? a.timestamp.getTime() : Date.now();
+        const timeB = b.timestamp ? b.timestamp.getTime() : Date.now();
+        return timeB - timeA;
+      });
+    }
+  }
 
   async createLog(insertLog: InsertLog): Promise<Log> {
     const now = new Date();
@@ -715,6 +783,8 @@ export class DatabaseStorage implements IStorage {
         message: insertLog.message,
         type: insertLog.type || 'info',
         agentId: insertLog.agentId || null,
+        projectId: insertLog.projectId || null,
+        targetAgentId: insertLog.targetAgentId || null,
         details: insertLog.details || null,
         timestamp: now
       })
@@ -1022,6 +1092,55 @@ export class DatabaseStorage implements IStorage {
           agentId: 2, 
           type: "info", 
           message: "Task received. Beginning component architecture planning.", 
+        },
+        // Add conversation logs
+        {
+          agentId: 1,
+          targetAgentId: 2,
+          type: "conversation",
+          projectId: createdProjects[0].id,
+          message: "I need you to build a secure authentication system for our e-commerce platform.",
+          details: "Requirements:\n- Login/Logout\n- Registration with email verification\n- Password reset\n- Remember me functionality\n- OAuth integration"
+        },
+        {
+          agentId: 2,
+          targetAgentId: 1,
+          type: "conversation",
+          projectId: createdProjects[0].id,
+          message: "I'll implement the authentication system. What security requirements should I consider?",
+          details: null
+        },
+        {
+          agentId: 1,
+          targetAgentId: 2,
+          type: "conversation",
+          projectId: createdProjects[0].id,
+          message: "Ensure you're using secure password hashing with bcrypt, HTTPS for all auth routes, and implement rate limiting to prevent brute force attacks.",
+          details: "Additional security considerations:\n- JWT with short expiration\n- Secure HTTP-only cookies\n- CSRF protection\n- Input validation"
+        },
+        {
+          agentId: 2,
+          targetAgentId: 1,
+          type: "conversation",
+          projectId: createdProjects[0].id,
+          message: "Understood. I'll implement these security measures. Will start with the core authentication endpoints and password hashing logic.",
+          details: null
+        },
+        {
+          agentId: 1,
+          targetAgentId: 3,
+          type: "conversation",
+          projectId: createdProjects[0].id,
+          message: "Debugger, once the authentication component is ready, prioritize security testing and look for common vulnerabilities.",
+          details: "Focus areas:\n- SQL injection\n- XSS vulnerabilities\n- Authentication bypass\n- Session management issues"
+        },
+        {
+          agentId: 3, 
+          targetAgentId: 1,
+          type: "conversation",
+          projectId: createdProjects[0].id,
+          message: "Will do. I'll create a comprehensive test suite for security vulnerabilities and edge cases for the authentication flow.",
+          details: null
         }
       ];
       

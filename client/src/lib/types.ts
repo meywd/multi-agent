@@ -24,10 +24,12 @@ export interface Task {
 
 export interface Log {
   id: number;
-  agentId: number;
+  agentId: number | null;
+  targetAgentId?: number | null;
+  projectId?: number | null;
   type: string;
   message: string;
-  details?: string;
+  details?: string | null;
   timestamp: Date;
 }
 

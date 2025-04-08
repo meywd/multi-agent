@@ -190,3 +190,17 @@ export async function getTasksByProject(projectId: number): Promise<Task[]> {
     url: `/api/projects/${projectId}/tasks`
   });
 }
+
+export async function getLogsByProject(projectId: number): Promise<Log[]> {
+  return await apiRequest({
+    method: "GET",
+    url: `/api/logs?projectId=${projectId}`
+  });
+}
+
+export async function getProjectConversations(projectId: number): Promise<Log[]> {
+  return await apiRequest({
+    method: "GET",
+    url: `/api/projects/${projectId}/conversations`
+  });
+}

@@ -104,13 +104,16 @@ export const logTypeEnum = pgEnum("log_type", [
   "info",
   "warning",
   "error",
-  "success"
+  "success",
+  "conversation"  // Added for agent-to-agent conversations
 ]);
 
 // Log schema
 export const logs = pgTable("logs", {
   id: serial("id").primaryKey(),
   agentId: integer("agent_id").references(() => agents.id),
+  projectId: integer("project_id").references(() => projects.id),
+  targetAgentId: integer("target_agent_id").references(() => agents.id), // For conversations between agents
   type: text("type").notNull().default("info"),
   message: text("message").notNull(),
   details: text("details"),
@@ -119,6 +122,8 @@ export const logs = pgTable("logs", {
 
 export const insertLogSchema = createInsertSchema(logs).pick({
   agentId: true,
+  projectId: true,
+  targetAgentId: true,
   type: true,
   message: true,
   details: true,

@@ -1,6 +1,6 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { getProject, getTasksByProject } from "@/lib/agentService";
+import { getProject, getTasksByProject, getProjectConversations } from "@/lib/agentService";
 import { 
   Card, 
   CardContent, 
@@ -11,10 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Project, Task } from "@/lib/types";
+import { Project, Task, Log } from "@/lib/types";
 import { Link } from "wouter";
-import { ArrowLeft, Clock, Calendar } from "lucide-react";
+import { ArrowLeft, Clock, Calendar, MessageSquare, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -27,15 +28,7 @@ export default function ProjectDetailPage() {
   } = useQuery({
     queryKey: ["/api/projects", projectId],
     queryFn: () => getProject(projectId),
-    enabled: !!projectId && !isNaN(projectId),
-    onError: (error: any) => {
-      console.error("Error fetching project:", error);
-      toast({
-        title: "Error",
-        description: `Failed to load project details: ${error.message}`,
-        variant: "destructive",
-      });
-    }
+    enabled: !!projectId && !isNaN(projectId)
   });
 
   const { 
@@ -44,15 +37,16 @@ export default function ProjectDetailPage() {
   } = useQuery({
     queryKey: ["/api/projects", projectId, "tasks"],
     queryFn: () => getTasksByProject(projectId),
-    enabled: !!projectId && !isNaN(projectId),
-    onError: (error: any) => {
-      console.error("Error fetching tasks:", error);
-      toast({
-        title: "Error",
-        description: `Failed to load project tasks: ${error.message}`,
-        variant: "destructive",
-      });
-    }
+    enabled: !!projectId && !isNaN(projectId)
+  });
+  
+  const {
+    data: conversations = [],
+    isLoading: isLoadingConversations
+  } = useQuery({
+    queryKey: ["/api/projects", projectId, "conversations"],
+    queryFn: () => getProjectConversations(projectId),
+    enabled: !!projectId && !isNaN(projectId)
   });
 
   const getStatusColor = (status: string) => {
@@ -236,6 +230,60 @@ export default function ProjectDetailPage() {
                       ></div>
                     </div>
                     <span className="ml-2 text-xs">{task.progress}%</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+      
+      <div className="mt-8 mb-4">
+        <h2 className="text-lg sm:text-xl font-semibold flex items-center">
+          <MessageSquare className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+          <span>Agent Communications</span>
+          <Badge className="ml-2 text-xs">{conversations.length}</Badge>
+        </h2>
+      </div>
+      
+      {isLoadingConversations ? (
+        <div className="animate-pulse space-y-4">
+          <div className="h-24 bg-gray-200 rounded-md"></div>
+          <div className="h-24 bg-gray-200 rounded-md"></div>
+        </div>
+      ) : conversations.length === 0 ? (
+        <Card className="text-center p-6">
+          <CardContent>
+            <p className="text-muted-foreground text-xs sm:text-sm">No agent conversations recorded for this project yet.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {conversations.map((log) => (
+            <Card key={log.id} className="overflow-hidden border-l-4 border-l-primary">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <div className="bg-primary/10 p-2 rounded-full">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm">
+                        {log.agentId ? `Agent #${log.agentId}` : "System"} 
+                        {log.targetAgentId && <span className="text-muted-foreground"> → Agent #{log.targetAgentId}</span>}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                    <p className="mt-1 text-sm">{log.message}</p>
+                    {log.details && (
+                      <div className="mt-2 bg-muted/50 p-2 rounded text-xs whitespace-pre-wrap">
+                        {log.details}
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

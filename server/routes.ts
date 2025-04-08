@@ -279,11 +279,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Log routes
   app.get('/api/logs', async (req, res) => {
     try {
-      const { agentId } = req.query;
+      const { agentId, projectId, type } = req.query;
       
       let logs;
       if (agentId) {
         logs = await storage.getLogsByAgent(parseInt(agentId as string));
+      } else if (projectId) {
+        logs = await storage.getLogsByProject(parseInt(projectId as string));
+      } else if (type === 'conversation') {
+        logs = await storage.getConversationLogs();
       } else {
         logs = await storage.getLogs();
       }
@@ -291,6 +295,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(logs);
     } catch (err) {
       res.status(500).json({ message: 'Error fetching logs' });
+    }
+  });
+  
+  // Get conversation logs by project
+  app.get('/api/projects/:id/conversations', async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const logs = await storage.getConversationLogs(projectId);
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: 'Error fetching project conversations' });
     }
   });
   
