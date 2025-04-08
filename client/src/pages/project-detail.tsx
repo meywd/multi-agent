@@ -14,21 +14,45 @@ import { Separator } from "@/components/ui/separator";
 import { Project, Task } from "@/lib/types";
 import { Link } from "wouter";
 import { ArrowLeft, Clock, Calendar } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
+  const { toast } = useToast();
   const projectId = parseInt(id as string);
 
-  const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
+  const { 
+    data: project, 
+    isLoading: isLoadingProject
+  } = useQuery({
     queryKey: ["/api/projects", projectId],
     queryFn: () => getProject(projectId),
-    enabled: !!projectId && !isNaN(projectId)
+    enabled: !!projectId && !isNaN(projectId),
+    onError: (error: any) => {
+      console.error("Error fetching project:", error);
+      toast({
+        title: "Error",
+        description: `Failed to load project details: ${error.message}`,
+        variant: "destructive",
+      });
+    }
   });
 
-  const { data: tasks = [], isLoading: isLoadingTasks } = useQuery<Task[]>({
+  const { 
+    data: tasks = [], 
+    isLoading: isLoadingTasks
+  } = useQuery({
     queryKey: ["/api/projects", projectId, "tasks"],
     queryFn: () => getTasksByProject(projectId),
-    enabled: !!projectId && !isNaN(projectId)
+    enabled: !!projectId && !isNaN(projectId),
+    onError: (error: any) => {
+      console.error("Error fetching tasks:", error);
+      toast({
+        title: "Error",
+        description: `Failed to load project tasks: ${error.message}`,
+        variant: "destructive",
+      });
+    }
   });
 
   const getStatusColor = (status: string) => {
