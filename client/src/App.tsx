@@ -1,6 +1,7 @@
-import { Route, Switch, useLocation } from "wouter";
+import { Route, Switch } from "wouter";
 import Dashboard from "@/pages/dashboard";
 import ProjectsPage from "@/pages/projects";
+import ProjectDetailPage from "@/pages/project-detail";
 import PlaygroundPage from "@/pages/playground";
 import NotFound from "@/pages/not-found";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -8,7 +9,6 @@ import { Header } from "@/components/layout/Header";
 import { useState } from "react";
 
 function App() {
-  const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleSidebar = () => {
@@ -24,6 +24,7 @@ function App() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/projects" component={ProjectsPage} />
+            <Route path="/projects/:id" component={ProjectDetailPage} />
             <Route path="/playground" component={PlaygroundPage} />
             <Route component={NotFound} />
           </Switch>

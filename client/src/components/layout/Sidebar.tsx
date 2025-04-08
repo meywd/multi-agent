@@ -166,7 +166,16 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       <nav className="flex-1 px-2 py-4">
         <div className="space-y-1">
           {navItems.map(item => (
-            <Link key={item.name} href={item.href} onClick={() => onToggle()}>
+            <Link 
+              key={item.name} 
+              href={item.href} 
+              onClick={(e) => {
+                // Close sidebar on mobile
+                if (window.innerWidth < 768) {
+                  onToggle();
+                }
+              }}
+            >
               <Button
                 variant={item.isActive ? "secondary" : "ghost"}
                 className={`w-full justify-start ${item.isActive ? 'font-medium' : ''}`}

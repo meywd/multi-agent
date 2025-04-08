@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { X } from "lucide-react";
 import { Project } from "@/lib/types";
+import { Link } from "wouter";
 
 export default function ProjectsSection() {
   const { toast } = useToast();
@@ -204,9 +205,11 @@ export default function ProjectsSection() {
                     Completed: {new Date(project.completedAt).toLocaleDateString()}
                   </div>
                 )}
-                <Button variant="outline" size="sm" className="mt-2 text-xs sm:text-sm">
-                  View Details
-                </Button>
+                <Link href={`/projects/${project.id}`}>
+                  <Button variant="outline" size="sm" className="mt-2 text-xs sm:text-sm">
+                    View Details
+                  </Button>
+                </Link>
               </CardFooter>
             </Card>
           ))}

@@ -15,6 +15,7 @@ import { z } from "zod";
 import { insertProjectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Project } from "@/lib/types";
+import { Link } from "wouter";
 
 const projectSchema = insertProjectSchema.extend({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -202,9 +203,11 @@ export default function ProjectsPage() {
               <CardContent className="pt-3 sm:pt-4 p-3 sm:p-4">
                 <p className="text-xs sm:text-sm text-gray-700 line-clamp-3">{project.description}</p>
                 <div className="mt-3 sm:mt-4 flex justify-end">
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    View Details
-                  </Button>
+                  <Link href={`/projects/${project.id}`}>
+                    <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                      View Details
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
