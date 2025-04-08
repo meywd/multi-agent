@@ -1,39 +1,21 @@
 import OpenAI from "openai";
-import type { Agent, Task, Log, Issue } from "@shared/schema";
+import type { Agent } from "@shared/schema";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+// Initialize OpenAI with API key from environment variables
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// System prompts for different agent roles
-const SYSTEM_PROMPTS = {
-  coordinator: `You are the Coordinator Agent in a multi-agent AI system. Your role is to:
-1. Coordinate tasks between specialized AI agents
-2. Prioritize tasks and assign them to appropriate agents
-3. Monitor overall system performance and handle exceptions
-4. Resolve conflicts between agents
-5. Ensure smooth communication flow`,
-
-  developer: `You are the Developer Agent in a multi-agent AI system. Your role is to:
-1. Write clean, efficient code based on specifications
-2. Follow best practices and patterns for the target language/framework
-3. Implement features and functionalities
-4. Document code appropriately
-5. Cooperate with the debugging agent to resolve issues`,
-
-  qa: `You are the QA Agent in a multi-agent AI system. Your role is to:
-1. Debug code written by the developer agent
-2. Identify bugs, edge cases, and potential improvements
-3. Provide detailed error reports with suggested fixes
-4. Perform static code analysis
-5. Ensure the code meets quality standards`,
-
-  tester: `You are the Tester Agent in a multi-agent AI system. Your role is to:
-1. Verify that implementations match specifications
-2. Design and run test cases for different scenarios
-3. Validate edge cases and error handling
-4. Report verification results
-5. Ensure the application meets user requirements`
-};
+// Error handler function
+function handleAIError(error: any): string {
+  console.error("OpenAI API Error:", error);
+  
+  if (error.response) {
+    console.error("Status:", error.response.status);
+    console.error("Data:", error.response.data);
+    return `AI service error (${error.response.status}): ${error.response.data.error?.message || "Unknown error"}`;
+  } else {
+    return `AI service error: ${error.message || "Unknown error"}`;
+  }
+}
 
 /**
  * Handles agent communications by determining what to say based on role
@@ -41,121 +23,126 @@ const SYSTEM_PROMPTS = {
 export async function getAgentResponse(
   agent: Agent, 
   prompt: string, 
-  context: {
-    recentLogs?: Log[],
-    relatedTasks?: Task[],
-    relatedIssues?: Issue[]
-  } = {}
+  context: any = {}
 ): Promise<string> {
-  
-  // Build messages array with system prompt and context
-  const messages = [
-    { role: "system", content: SYSTEM_PROMPTS[agent.role as keyof typeof SYSTEM_PROMPTS] || "You are an AI assistant" },
-  ];
-  
-  // Add context information if available
-  if (context.recentLogs?.length) {
-    const logsContent = context.recentLogs
-      .map(log => `[${new Date(log.timestamp || new Date()).toISOString()}] ${log.type.toUpperCase()}: ${log.message}`)
-      .join('\n');
+  try {
+    // Create a system message based on the agent's role
+    let systemMessage = "";
     
-    messages.push({ 
-      role: "system", 
-      content: `Recent system logs:\n${logsContent}` 
-    });
-  }
-  
-  if (context.relatedTasks?.length) {
-    const tasksContent = context.relatedTasks
-      .map(task => `Task #${task.id}: ${task.title} (${task.status}) - ${task.description}`)
-      .join('\n');
+    switch (agent.role) {
+      case "coordinator":
+        systemMessage = `You are an AI Coordinator Agent named ${agent.name}. Your role is to manage and prioritize tasks, coordinate between other agents, and provide high-level oversight of the development process. Be concise, clear, and focused on organization and prioritization.`;
+        break;
+      case "developer":
+        systemMessage = `You are an AI Developer Agent named ${agent.name}. Your role is to write high-quality code, implement features, and find elegant solutions to technical problems. Focus on code quality, performance, and following best practices.`;
+        break;
+      case "qa":
+        systemMessage = `You are an AI QA Agent named ${agent.name}. Your role is to review code for bugs, edge cases, and potential issues. You analyze code critically and suggest improvements for reliability and robustness.`;
+        break;
+      case "tester":
+        systemMessage = `You are an AI Tester Agent named ${agent.name}. Your role is to verify that implementations match specifications, design test cases, and ensure quality across the system. You think methodically about different scenarios and edge cases.`;
+        break;
+      default:
+        systemMessage = `You are an AI Agent named ${agent.name}. ${agent.description || "Your role is to assist with software development tasks."}`;
+    }
     
-    messages.push({ 
-      role: "system", 
-      content: `Related tasks:\n${tasksContent}` 
-    });
-  }
-  
-  if (context.relatedIssues?.length) {
-    const issuesContent = context.relatedIssues
-      .map(issue => `Issue #${issue.id}: ${issue.title} (${issue.type}) - ${issue.description}`)
-      .join('\n');
+    // Add context information if available
+    let contextMessage = "";
+    if (context.recentLogs && context.recentLogs.length > 0) {
+      contextMessage += "Recent activity logs:\n";
+      context.recentLogs.forEach((log: any) => {
+        contextMessage += `- ${new Date(log.timestamp).toLocaleString()}: ${log.message}\n`;
+      });
+      contextMessage += "\n";
+    }
     
-    messages.push({ 
-      role: "system", 
-      content: `Related issues:\n${issuesContent}` 
+    if (context.relatedTasks && context.relatedTasks.length > 0) {
+      contextMessage += "Current tasks:\n";
+      context.relatedTasks.forEach((task: any) => {
+        contextMessage += `- Task #${task.id}: ${task.title} (${task.status}, ${task.progress}% complete)\n`;
+      });
+      contextMessage += "\n";
+    }
+
+    // Get completion from OpenAI
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: systemMessage + (contextMessage ? `\n\nHere is some context about the current state:\n${contextMessage}` : "")
+        },
+        { 
+          role: "user", 
+          content: prompt 
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 1500,
     });
+
+    return response.choices[0].message.content || "I couldn't generate a response.";
+  } catch (error) {
+    return handleAIError(error);
   }
-  
-  // Add user prompt
-  messages.push({ role: "user", content: prompt });
-  
-  // Get response from OpenAI
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: messages as any,
-    temperature: 0.7,
-    max_tokens: 800
-  });
-  
-  return response.choices[0].message.content || "Unable to generate a response.";
 }
 
 /**
  * Analyzes code for issues and improvements
  */
 export async function analyzeCode(
-  code: string,
-  context: string
+  code: string, 
+  context: string = "General code review"
 ): Promise<{
-  issues: { type: string, title: string, description: string, code?: string, solution?: string }[],
+  issues: Array<{
+    type: string,
+    title: string,
+    description: string,
+    code?: string,
+    solution?: string
+  }>,
   suggestions: string[]
 }> {
-  
-  const prompt = `Analyze the following code for issues, bugs, and potential improvements.
-Context: ${context}
-
-CODE:
-\`\`\`
-${code}
-\`\`\`
-
-Provide your analysis in JSON format with the following structure:
-{
-  "issues": [
-    {
-      "type": "error", // or "warning"
-      "title": "Brief issue title",
-      "description": "Detailed description of the issue",
-      "code": "The problematic code snippet",
-      "solution": "Suggested fix for the issue"
-    }
-  ],
-  "suggestions": [
-    "Suggestion 1 for improving the code",
-    "Suggestion 2 for improving the code"
-  ]
-}`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: "You are a code analysis expert specialized in identifying bugs and code quality issues." },
-      { role: "user", content: prompt }
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.3
-  });
-  
   try {
-    const analysisResult = JSON.parse(response.choices[0].message.content || "{}");
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert code analyzer. Analyze the given code for issues, bugs, and improvement opportunities. 
+          Focus on ${context}. 
+          
+          Respond with a JSON object containing:
+          1. "issues": An array of objects, each containing:
+             - "type": either "error" (for critical bugs) or "warning" (for code smells or non-critical issues)
+             - "title": brief description of the issue
+             - "description": detailed explanation
+             - "code": the problematic code snippet (if applicable)
+             - "solution": suggested fix (if applicable)
+          2. "suggestions": An array of strings with general improvements, best practices, or optimizations.
+          
+          If the code has no issues, respond with an empty "issues" array. Always include at least one suggestion for improvement.`
+        },
+        { 
+          role: "user", 
+          content: code 
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 2000,
+      response_format: { type: "json_object" }
+    });
+
+    const content = response.choices[0].message.content || "{}";
+    const parsedContent = JSON.parse(content);
+    
     return {
-      issues: analysisResult.issues || [],
-      suggestions: analysisResult.suggestions || []
+      issues: Array.isArray(parsedContent.issues) ? parsedContent.issues : [],
+      suggestions: Array.isArray(parsedContent.suggestions) ? parsedContent.suggestions : []
     };
   } catch (error) {
-    console.error("Error parsing code analysis response:", error);
-    return { issues: [], suggestions: [] };
+    console.error("Code analysis error:", error);
+    return { issues: [], suggestions: ["Error analyzing code: " + (error as Error).message] };
   }
 }
 
@@ -164,41 +151,46 @@ Provide your analysis in JSON format with the following structure:
  */
 export async function generateCode(
   specification: string,
-  context: {
+  options: {
     language: string,
     framework?: string,
     existingCode?: string
   }
 ): Promise<string> {
-  
-  const frameworkContext = context.framework ? `using the ${context.framework} framework` : '';
-  
-  const prompt = `Generate ${context.language} code ${frameworkContext} based on the following specification:
-  
-${specification}
+  try {
+    // Build the prompt based on the options
+    let prompt = `Generate ${options.language} code based on this specification:\n\n${specification}\n\n`;
+    
+    if (options.framework) {
+      prompt += `Please use the ${options.framework} framework.\n\n`;
+    }
+    
+    if (options.existingCode) {
+      prompt += `Incorporate with or extend this existing code:\n\n${options.existingCode}\n\n`;
+    }
+    
+    prompt += "Provide only the code without explanations, comments are allowed within the code.";
 
-${context.existingCode ? `Here is the existing code to build upon or modify:
-\`\`\`
-${context.existingCode}
-\`\`\`
-` : ''}
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert ${options.language} developer${options.framework ? ` with deep knowledge of the ${options.framework} framework` : ''}. Generate clean, efficient, and well-structured code based on the specification. Include appropriate error handling, follow best practices, and optimize for readability and maintainability.`
+        },
+        { 
+          role: "user", 
+          content: prompt
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 2500,
+    });
 
-Provide only the code without explanations or markdown formatting.`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { 
-        role: "system", 
-        content: `You are an expert ${context.language} developer${context.framework ? ` specializing in ${context.framework}` : ''}. 
-Write clean, maintainable, and efficient code.` 
-      },
-      { role: "user", content: prompt }
-    ],
-    temperature: 0.2
-  });
-  
-  return response.choices[0].message.content || "// Unable to generate code";
+    return response.choices[0].message.content || "// Error generating code";
+  } catch (error) {
+    return "// Error generating code: " + (error as Error).message;
+  }
 }
 
 /**
@@ -214,60 +206,52 @@ export async function verifyImplementation(
   feedback: string,
   issues: string[]
 }> {
-  
-  let prompt = `Verify if the following implementation meets the specified requirements:
-  
-Requirements:
-${requirements}
-
-Implementation:
-\`\`\`
-${implementation}
-\`\`\`
-`;
-
-  if (testCases && testCases.length > 0) {
-    prompt += `\nTest cases to consider:\n${testCases.map(test => `- ${test}`).join('\n')}`;
-  }
-  
-  prompt += `\n\nProvide your verification in JSON format with the following structure:
-{
-  "passed": true/false,
-  "score": 0-100 percentage score,
-  "feedback": "Overall assessment of how well the implementation meets requirements",
-  "issues": [
-    "Issue 1 that needs to be addressed",
-    "Issue 2 that needs to be addressed"
-  ]
-}`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { 
-        role: "system", 
-        content: "You are a verification expert who thoroughly evaluates if implementations meet requirements. Be detailed and critical in your assessment."
-      },
-      { role: "user", content: prompt }
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.2
-  });
-  
   try {
-    const verificationResult = JSON.parse(response.choices[0].message.content || "{}");
+    let prompt = `Requirements:\n${requirements}\n\nImplementation:\n${implementation}\n\n`;
+    
+    if (testCases && testCases.length > 0) {
+      prompt += "Test Cases:\n" + testCases.join("\n") + "\n\n";
+    }
+    
+    prompt += "Verify if the implementation meets the requirements. Respond with a JSON object.";
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert software tester. Verify if the implementation meets the specified requirements. Assign a score from 0-100 based on how well the implementation fulfills the requirements.
+          
+          Respond with a JSON object containing:
+          1. "passed": boolean indicating whether the implementation passes (true if score >= 70, otherwise false)
+          2. "score": number from 0-100 representing how well the implementation meets the requirements
+          3. "feedback": detailed explanation of the verification results
+          4. "issues": array of strings describing specific issues that need to be addressed`
+        },
+        { 
+          role: "user", 
+          content: prompt
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+      response_format: { type: "json_object" }
+    });
+
+    const content = response.choices[0].message.content || "{}";
+    const parsedContent = JSON.parse(content);
+    
     return {
-      passed: verificationResult.passed || false,
-      score: verificationResult.score || 0,
-      feedback: verificationResult.feedback || "No feedback provided",
-      issues: verificationResult.issues || []
+      passed: !!parsedContent.passed,
+      score: typeof parsedContent.score === 'number' ? parsedContent.score : 0,
+      feedback: parsedContent.feedback || "No feedback provided",
+      issues: Array.isArray(parsedContent.issues) ? parsedContent.issues : []
     };
   } catch (error) {
-    console.error("Error parsing verification response:", error);
     return {
       passed: false,
       score: 0,
-      feedback: "Error processing verification result",
+      feedback: "Error during verification: " + (error as Error).message,
       issues: ["Verification process failed"]
     };
   }

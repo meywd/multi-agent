@@ -1,19 +1,11 @@
 import { Route, Switch, useLocation } from "wouter";
-import { useEffect } from "react";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
-import { useAgentContext } from "./context/AgentContext";
 
 function App() {
   const location = useLocation();
-  const { connectWebSocket } = useAgentContext();
-
-  // Connect to WebSocket when the app loads
-  useEffect(() => {
-    connectWebSocket();
-  }, [connectWebSocket]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">

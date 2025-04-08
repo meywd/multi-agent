@@ -5,9 +5,16 @@ import { AgentCommunicationFlow } from "@/components/dashboard/AgentCommunicatio
 import { TaskQueuePanel } from "@/components/dashboard/TaskQueuePanel";
 import { AgentMonitorPanel } from "@/components/dashboard/AgentMonitorPanel";
 import { DebugConsole } from "@/components/dashboard/DebugConsole";
+import { AgentInteractionPanel } from "@/components/dashboard/AgentInteractionPanel";
+import { CodePlayground } from "@/components/dashboard/CodePlayground";
 
 export default function Dashboard() {
-  const { agents, tasks, metrics, isLoading } = useAgentContext();
+  const { agents, tasks, metrics, isLoading, connectWebSocket } = useAgentContext();
+  
+  // Connect to WebSocket when the dashboard loads
+  useEffect(() => {
+    connectWebSocket();
+  }, [connectWebSocket]);
 
   if (isLoading) {
     return (
@@ -182,9 +189,20 @@ export default function Dashboard() {
       </div>
 
       {/* Agent Activity Details Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <AgentMonitorPanel />
-        <DebugConsole />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+        <div className="xl:col-span-1">
+          <AgentInteractionPanel />
+        </div>
+        <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <AgentMonitorPanel />
+          <DebugConsole />
+        </div>
+      </div>
+      
+      {/* Code Playground Section */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-neutral-800 mb-4">Development Tools</h2>
+        <CodePlayground />
       </div>
     </div>
   );
