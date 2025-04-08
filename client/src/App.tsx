@@ -3,6 +3,8 @@ import Dashboard from "@/pages/dashboard";
 import ProjectsPage from "@/pages/projects";
 import ProjectDetailPage from "@/pages/project-detail";
 import PlaygroundPage from "@/pages/playground";
+import AgentsPage from "@/pages/agents";
+import TasksPage from "@/pages/tasks";
 import NotFound from "@/pages/not-found";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
@@ -25,6 +27,8 @@ function App() {
             <Route path="/" component={Dashboard} />
             <Route path="/projects" component={ProjectsPage} />
             <Route path="/projects/:id" component={ProjectDetailPage} />
+            <Route path="/agents" component={AgentsPage} />
+            <Route path="/tasks" component={TasksPage} />
             <Route path="/playground" component={PlaygroundPage} />
             <Route component={NotFound} />
           </Switch>
