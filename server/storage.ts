@@ -463,7 +463,13 @@ export class DatabaseStorage implements IStorage {
   async createAgent(insertAgent: InsertAgent): Promise<Agent> {
     const [agent] = await db
       .insert(agents)
-      .values(insertAgent)
+      .values({
+        name: insertAgent.name,
+        role: insertAgent.role,
+        status: insertAgent.status || 'offline',
+        description: insertAgent.description || null,
+        createdAt: new Date()
+      })
       .returning();
     return agent;
   }
@@ -496,11 +502,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTask(insertTask: InsertTask): Promise<Task> {
+    const now = new Date();
     const [task] = await db
       .insert(tasks)
       .values({
-        ...insertTask,
-        progress: 0
+        title: insertTask.title,
+        description: insertTask.description || null,
+        status: insertTask.status || 'queued',
+        priority: insertTask.priority || 'medium',
+        assignedTo: insertTask.assignedTo || null,
+        estimatedTime: insertTask.estimatedTime || null,
+        progress: 0,
+        createdAt: now,
+        updatedAt: now
       })
       .returning();
     return task;
@@ -545,13 +559,20 @@ export class DatabaseStorage implements IStorage {
     return db.select()
       .from(logs)
       .where(eq(logs.agentId, agentId))
-      .orderBy(desc(logs.timestamp));
+      .orderBy((logs) => desc(logs.timestamp));
   }
 
   async createLog(insertLog: InsertLog): Promise<Log> {
+    const now = new Date();
     const [log] = await db
       .insert(logs)
-      .values(insertLog)
+      .values({
+        message: insertLog.message,
+        type: insertLog.type || 'info',
+        agentId: insertLog.agentId || null,
+        details: insertLog.details || null,
+        timestamp: now
+      })
       .returning();
     return log;
   }
@@ -573,8 +594,14 @@ export class DatabaseStorage implements IStorage {
     const [issue] = await db
       .insert(issues)
       .values({
-        ...insertIssue,
-        resolved: false
+        title: insertIssue.title,
+        description: insertIssue.description,
+        type: insertIssue.type || 'warning',
+        taskId: insertIssue.taskId || null,
+        code: insertIssue.code || null,
+        solution: insertIssue.solution || null,
+        resolved: false,
+        createdAt: new Date()
       })
       .returning();
     return issue;

@@ -28,12 +28,11 @@ export default function PlaygroundPage() {
     async function loadAgents() {
       setIsLoading(true);
       try {
-        const loadedAgents = await apiRequest({
+        const agentsData = await apiRequest({
           url: "/api/agents",
           method: "GET"
         });
         
-        const agentsData = loadedAgents as Agent[];
         setAgents(agentsData || []);
         if (agentsData && agentsData.length > 0) {
           setSelectedAgentId(agentsData[0].id);
@@ -67,14 +66,13 @@ export default function PlaygroundPage() {
     setAgentResponse("");
     
     try {
-      const response = await apiRequest({
+      const responseData = await apiRequest({
         url: `/api/agents/${selectedAgentId}/query`,
         method: "POST",
         body: { prompt, includeContext: true },
       });
       
-      if (response) {
-        const responseData = response as { response: string };
+      if (responseData) {
         setAgentResponse(responseData.response);
       }
     } catch (error) {
