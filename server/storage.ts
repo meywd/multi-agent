@@ -763,58 +763,104 @@ export class DatabaseStorage implements IStorage {
   
   // Project methods
   async getProjects(): Promise<Project[]> {
-    return db.select().from(projects);
+    try {
+      console.log("Fetching projects from database");
+      const result = await db.select().from(projects);
+      console.log(`Successfully fetched ${result.length} projects`);
+      return result;
+    } catch (err) {
+      console.error("Error in getProjects:", err);
+      throw err;
+    }
   }
   
   async getProject(id: number): Promise<Project | undefined> {
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
-    return project || undefined;
+    try {
+      console.log(`Fetching project with id ${id}`);
+      const [project] = await db.select().from(projects).where(eq(projects.id, id));
+      console.log("Project fetch result:", project || "Not found");
+      return project || undefined;
+    } catch (err) {
+      console.error(`Error in getProject(${id}):`, err);
+      throw err;
+    }
   }
   
   async createProject(insertProject: InsertProject): Promise<Project> {
-    const now = new Date();
-    const [project] = await db
-      .insert(projects)
-      .values({
+    try {
+      console.log("Creating new project:", insertProject);
+      const now = new Date();
+      const projectData = {
         name: insertProject.name,
         description: insertProject.description || null,
         status: insertProject.status || 'planning',
         createdAt: now,
         updatedAt: now,
         completedAt: null
-      })
-      .returning();
-    return project;
+      };
+      console.log("Project data to insert:", projectData);
+      
+      const [project] = await db
+        .insert(projects)
+        .values(projectData)
+        .returning();
+      
+      console.log("Project created successfully:", project);
+      return project;
+    } catch (err) {
+      console.error("Error in createProject:", err);
+      throw err;
+    }
   }
   
   async updateProjectStatus(id: number, status: string): Promise<Project | undefined> {
-    const project = await this.getProject(id);
-    if (!project) return undefined;
-    
-    const updateData: any = { 
-      status,
-      updatedAt: new Date()
-    };
-    
-    // If status changed to completed, set the completedAt timestamp
-    if (status === "completed" && project.status !== "completed") {
-      updateData.completedAt = new Date();
-    } 
-    // If status changed from completed to something else, clear the completedAt timestamp
-    else if (status !== "completed" && project.status === "completed") {
-      updateData.completedAt = null;
+    try {
+      console.log(`Updating project ${id} status to ${status}`);
+      const project = await this.getProject(id);
+      if (!project) {
+        console.log(`Project ${id} not found for status update`);
+        return undefined;
+      }
+      
+      const updateData: any = { 
+        status,
+        updatedAt: new Date()
+      };
+      
+      // If status changed to completed, set the completedAt timestamp
+      if (status === "completed" && project.status !== "completed") {
+        updateData.completedAt = new Date();
+      } 
+      // If status changed from completed to something else, clear the completedAt timestamp
+      else if (status !== "completed" && project.status === "completed") {
+        updateData.completedAt = null;
+      }
+      
+      console.log(`Updating project with data:`, updateData);
+      const [updatedProject] = await db
+        .update(projects)
+        .set(updateData)
+        .where(eq(projects.id, id))
+        .returning();
+      
+      console.log(`Project update result:`, updatedProject || "No result");
+      return updatedProject || undefined;
+    } catch (err) {
+      console.error(`Error in updateProjectStatus(${id}, ${status}):`, err);
+      throw err;
     }
-    
-    const [updatedProject] = await db
-      .update(projects)
-      .set(updateData)
-      .where(eq(projects.id, id))
-      .returning();
-    return updatedProject || undefined;
   }
   
   async getTasksByProject(projectId: number): Promise<Task[]> {
-    return db.select().from(tasks).where(eq(tasks.projectId, projectId));
+    try {
+      console.log(`Getting tasks for project ${projectId}`);
+      const result = await db.select().from(tasks).where(eq(tasks.projectId, projectId));
+      console.log(`Found ${result.length} tasks for project ${projectId}`);
+      return result;
+    } catch (err) {
+      console.error(`Error in getTasksByProject(${projectId}):`, err);
+      throw err;
+    }
   }
   
   // Dashboard metrics
