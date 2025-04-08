@@ -8,8 +8,15 @@ import {
   Issue, 
   InsertIssue,
   User,
-  InsertUser
+  InsertUser,
+  users,
+  agents,
+  tasks,
+  logs,
+  issues
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User methods (kept from original)
@@ -424,4 +431,309 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+  
+  // Agent methods
+  async getAgents(): Promise<Agent[]> {
+    return db.select().from(agents);
+  }
+
+  async getAgent(id: number): Promise<Agent | undefined> {
+    const [agent] = await db.select().from(agents).where(eq(agents.id, id));
+    return agent || undefined;
+  }
+
+  async createAgent(insertAgent: InsertAgent): Promise<Agent> {
+    const [agent] = await db
+      .insert(agents)
+      .values(insertAgent)
+      .returning();
+    return agent;
+  }
+
+  async updateAgentStatus(id: number, status: string): Promise<Agent | undefined> {
+    const [agent] = await db
+      .update(agents)
+      .set({ status })
+      .where(eq(agents.id, id))
+      .returning();
+    return agent || undefined;
+  }
+  
+  // Task methods
+  async getTasks(): Promise<Task[]> {
+    return db.select().from(tasks);
+  }
+
+  async getTask(id: number): Promise<Task | undefined> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return task || undefined;
+  }
+
+  async getTasksByStatus(status: string): Promise<Task[]> {
+    return db.select().from(tasks).where(eq(tasks.status, status));
+  }
+
+  async getTasksByAgent(agentId: number): Promise<Task[]> {
+    return db.select().from(tasks).where(eq(tasks.assignedTo, agentId));
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const [task] = await db
+      .insert(tasks)
+      .values({
+        ...insertTask,
+        progress: 0
+      })
+      .returning();
+    return task;
+  }
+
+  async updateTaskStatus(id: number, status: string, progress?: number): Promise<Task | undefined> {
+    const updateData: any = { 
+      status,
+      updatedAt: new Date()
+    };
+    
+    if (progress !== undefined) {
+      updateData.progress = progress;
+    }
+    
+    const [task] = await db
+      .update(tasks)
+      .set(updateData)
+      .where(eq(tasks.id, id))
+      .returning();
+    return task || undefined;
+  }
+
+  async updateTaskProgress(id: number, progress: number): Promise<Task | undefined> {
+    const [task] = await db
+      .update(tasks)
+      .set({ 
+        progress,
+        updatedAt: new Date() 
+      })
+      .where(eq(tasks.id, id))
+      .returning();
+    return task || undefined;
+  }
+  
+  // Log methods
+  async getLogs(): Promise<Log[]> {
+    return db.select().from(logs);
+  }
+
+  async getLogsByAgent(agentId: number): Promise<Log[]> {
+    return db.select()
+      .from(logs)
+      .where(eq(logs.agentId, agentId))
+      .orderBy(desc(logs.timestamp));
+  }
+
+  async createLog(insertLog: InsertLog): Promise<Log> {
+    const [log] = await db
+      .insert(logs)
+      .values(insertLog)
+      .returning();
+    return log;
+  }
+  
+  // Issue methods
+  async getIssues(): Promise<Issue[]> {
+    return db.select().from(issues);
+  }
+
+  async getIssuesByTask(taskId: number): Promise<Issue[]> {
+    return db.select().from(issues).where(eq(issues.taskId, taskId));
+  }
+
+  async getUnresolvedIssues(): Promise<Issue[]> {
+    return db.select().from(issues).where(eq(issues.resolved, false));
+  }
+
+  async createIssue(insertIssue: InsertIssue): Promise<Issue> {
+    const [issue] = await db
+      .insert(issues)
+      .values({
+        ...insertIssue,
+        resolved: false
+      })
+      .returning();
+    return issue;
+  }
+
+  async resolveIssue(id: number): Promise<Issue | undefined> {
+    const [issue] = await db
+      .update(issues)
+      .set({ resolved: true })
+      .where(eq(issues.id, id))
+      .returning();
+    return issue || undefined;
+  }
+  
+  // Dashboard metrics
+  async getDashboardMetrics(): Promise<{
+    activeAgents: number;
+    totalAgents: number;
+    tasksInQueue: number;
+    completedTasks: number;
+    issuesDetected: number;
+    criticalIssues: number;
+    warningIssues: number;
+    verificationRate: number;
+  }> {
+    // Get all agents
+    const allAgents = await this.getAgents();
+    const activeAgents = allAgents.filter(agent => agent.status === "online").length;
+    const totalAgents = allAgents.length;
+    
+    // Get all tasks
+    const allTasks = await this.getTasks();
+    const tasksInQueue = allTasks.filter(task => 
+      ["queued", "in_progress", "debugging", "verifying"].includes(task.status)
+    ).length;
+    const completedTasks = allTasks.filter(task => task.status === "completed").length;
+    const failedTasks = allTasks.filter(task => task.status === "failed").length;
+    
+    // Get all issues
+    const allIssues = await this.getIssues();
+    const issuesDetected = allIssues.length;
+    const criticalIssues = allIssues.filter(issue => issue.type === "error" && !issue.resolved).length;
+    const warningIssues = allIssues.filter(issue => issue.type === "warning" && !issue.resolved).length;
+    
+    // Calculate verification rate
+    const verifiedTasks = completedTasks > 0 ? completedTasks : 1;
+    const verificationRate = Math.round((verifiedTasks / (verifiedTasks + failedTasks)) * 100);
+    
+    return {
+      activeAgents,
+      totalAgents,
+      tasksInQueue,
+      completedTasks,
+      issuesDetected,
+      criticalIssues,
+      warningIssues,
+      verificationRate
+    };
+  }
+
+  // Helper method to initialize database with sample data if needed
+  async seedDatabase() {
+    // Check if we already have agents
+    const existingAgents = await this.getAgents();
+    
+    if (existingAgents.length === 0) {
+      // Initialize with default agents
+      const defaultAgents = [
+        { name: "Orchestrator", status: "online", role: "coordinator", description: "Coordinates tasks between agents" },
+        { name: "Builder", status: "online", role: "developer", description: "Builds application components" },
+        { name: "Debugger", status: "online", role: "qa", description: "Finds and fixes bugs" },
+        { name: "Verifier", status: "offline", role: "tester", description: "Verifies component functionality" }
+      ];
+      
+      for (const agent of defaultAgents) {
+        await this.createAgent(agent);
+      }
+      
+      // Initialize with sample tasks after agents are created
+      const sampleTasks = [
+        { 
+          title: "Build User Authentication Component", 
+          description: "Create login, registration and password reset components", 
+          status: "in_progress", 
+          priority: "high", 
+          assignedTo: 2, // Builder 
+          estimatedTime: 30
+        },
+        { 
+          title: "Fix API Integration Issues", 
+          description: "Fix issues with third-party API integration", 
+          status: "debugging", 
+          priority: "medium", 
+          assignedTo: 3, // Debugger 
+          estimatedTime: 45
+        },
+        { 
+          title: "Verify Form Validation Logic", 
+          description: "Ensure all form validations work correctly", 
+          status: "queued", 
+          priority: "low", 
+          assignedTo: 4, // Verifier 
+          estimatedTime: 60
+        }
+      ];
+      
+      for (const task of sampleTasks) {
+        await this.createTask(task);
+      }
+      
+      // Initialize sample logs
+      const now = new Date();
+      const sampleLogs = [
+        { 
+          agentId: 2, 
+          type: "info", 
+          message: "Builder agent initialized. Ready to process tasks.", 
+        },
+        { 
+          agentId: 1, 
+          type: "info", 
+          message: "Assigning task: Build User Authentication Component", 
+        },
+        { 
+          agentId: 2, 
+          type: "info", 
+          message: "Task received. Beginning component architecture planning.", 
+        }
+      ];
+      
+      for (const log of sampleLogs) {
+        await this.createLog(log);
+      }
+      
+      // Initialize sample issues
+      const sampleIssues = [
+        { 
+          taskId: 1, 
+          type: "error", 
+          title: "Undefined variable 'isAuthenticated'", 
+          description: "Undefined variable 'isAuthenticated' when checking authentication state", 
+          code: "useEffect(() => {\n  if (isAuthenticated) {  // <-- Error here\n    navigate('/dashboard');\n  }\n}, [user]);", 
+          solution: "useEffect(() => {\n  if (user !== null) {\n    navigate('/dashboard');\n  }\n}, [user]);", 
+        },
+        { 
+          taskId: 1, 
+          type: "warning", 
+          title: "Missing dependencies in useEffect", 
+          description: "React Hook useEffect has missing dependencies: 'token' and 'user'", 
+          code: "useEffect(() => {\n  // Some logic using token and user\n}, []);", 
+          solution: "Consider adding these variables to the dependency array to ensure proper reactivity.", 
+        }
+      ];
+      
+      for (const issue of sampleIssues) {
+        await this.createIssue(issue);
+      }
+    }
+  }
+}
+
+export const storage = new DatabaseStorage();

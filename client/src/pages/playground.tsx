@@ -28,14 +28,15 @@ export default function PlaygroundPage() {
     async function loadAgents() {
       setIsLoading(true);
       try {
-        const loadedAgents = await apiRequest<Agent[]>({
+        const loadedAgents = await apiRequest({
           url: "/api/agents",
           method: "GET"
         });
         
-        setAgents(loadedAgents || []);
-        if (loadedAgents && loadedAgents.length > 0) {
-          setSelectedAgentId(loadedAgents[0].id);
+        const agentsData = loadedAgents as Agent[];
+        setAgents(agentsData || []);
+        if (agentsData && agentsData.length > 0) {
+          setSelectedAgentId(agentsData[0].id);
         }
       } catch (error) {
         console.error("Error loading agents:", error);
@@ -66,14 +67,15 @@ export default function PlaygroundPage() {
     setAgentResponse("");
     
     try {
-      const response = await apiRequest<{ response: string }>({
+      const response = await apiRequest({
         url: `/api/agents/${selectedAgentId}/query`,
         method: "POST",
         body: { prompt, includeContext: true },
       });
       
       if (response) {
-        setAgentResponse(response.response);
+        const responseData = response as { response: string };
+        setAgentResponse(responseData.response);
       }
     } catch (error) {
       console.error("Error querying agent:", error);
