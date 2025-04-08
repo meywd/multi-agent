@@ -107,6 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  
   // Agent routes
   app.get('/api/agents', async (req, res) => {
     try {
