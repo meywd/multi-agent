@@ -558,6 +558,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const project = await storage.createProject(parsedBody.data);
+      
+      // Have the orchestrator agent (ID 1) start a conversation about the new project
+      try {
+        const orchestratorAgent = await storage.getAgent(1);
+        
+        if (orchestratorAgent) {
+          // Create a conversation log from the orchestrator
+          const message = `I notice we have a new project: "${project.name}". Could you tell me more about this project and what you'd like to accomplish? I can help break it down into tasks and coordinate our team's efforts.`;
+          
+          const conversationLog = await storage.createLog({
+            agentId: orchestratorAgent.id,
+            projectId: project.id,
+            type: 'conversation',
+            message: message,
+            details: `The Orchestrator is initiating a conversation about the newly created project: ${project.name}`
+          });
+          
+          // Broadcast the new log
+          broadcastMessage(wss, { type: 'log_created', log: conversationLog });
+        }
+      } catch (error) {
+        console.error('Error creating initial conversation:', error);
+        // Non-blocking error - we still want to return the created project
+      }
+      
       res.status(201).json(project);
       
       // Broadcast new project to all clients
@@ -598,6 +623,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(tasks);
     } catch (err) {
       res.status(500).json({ message: 'Error fetching project tasks' });
+    }
+  });
+  
+  // Add endpoint for responding to agent conversations
+  app.post('/api/projects/:id/respond', async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const { message, agentId } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ message: 'Message is required' });
+      }
+      
+      // Validate project exists
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      // Create a user response log (no agentId, which indicates it's from the user)
+      const responseLog = await storage.createLog({
+        agentId: null,
+        targetAgentId: agentId || null, // Target the specific agent if provided
+        projectId,
+        type: 'conversation',
+        message,
+        details: null
+      });
+      
+      // Broadcast the new log
+      broadcastMessage(wss, { type: 'log_created', log: responseLog });
+      
+      // Now, have the agent respond (if a target agent was specified)
+      if (agentId) {
+        try {
+          const agent = await storage.getAgent(agentId);
+          
+          if (agent) {
+            // Generate an agent response based on the message
+            const response = await getAgentResponse(agent, message, {
+              project,
+              allProjects: await storage.getProjects(),
+              recentLogs: await storage.getLogsByProject(projectId)
+            });
+            
+            // Create a conversation log from the agent
+            const agentResponseLog = await storage.createLog({
+              agentId: agent.id,
+              projectId,
+              type: 'conversation',
+              message: response,
+              details: null
+            });
+            
+            // Broadcast the new log
+            broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
+          }
+        } catch (error) {
+          console.error('Error creating agent response:', error);
+          // Non-blocking error - we still want to return the user's response
+        }
+      }
+      
+      res.status(201).json(responseLog);
+    } catch (err) {
+      console.error('Error responding to conversation:', err);
+      res.status(500).json({ message: 'Error responding to conversation' });
     }
   });
 

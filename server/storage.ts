@@ -106,16 +106,8 @@ export class MemStorage implements IStorage {
     this.currentIssueId = 1;
     this.currentProjectId = 1;
     
-    // Initialize sample projects
-    this.initializeSampleProjects();
-    // Initialize with default agents
+    // Initialize with default agents only
     this.initializeDefaultAgents();
-    // Initialize with sample tasks
-    this.initializeSampleTasks();
-    // Initialize with sample logs
-    this.initializeSampleLogs();
-    // Initialize with sample issues
-    this.initializeSampleIssues();
   }
   
   private initializeSampleProjects() {
@@ -968,13 +960,13 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Helper method to initialize database with sample data if needed
+  // Helper method to initialize database with only agents
   async seedDatabase() {
     // Check if we already have agents
     const existingAgents = await this.getAgents();
     
     if (existingAgents.length === 0) {
-      // Initialize with default agents
+      // Initialize with default agents only
       const defaultAgents = [
         { name: "Orchestrator", status: "online", role: "coordinator", description: "Coordinates tasks between agents" },
         { name: "Builder", status: "online", role: "developer", description: "Builds application components" },
@@ -984,181 +976,6 @@ export class DatabaseStorage implements IStorage {
       
       for (const agent of defaultAgents) {
         await this.createAgent(agent);
-      }
-      
-      // Initialize with sample projects
-      const sampleProjects = [
-        {
-          name: "E-commerce Platform",
-          description: "A complete e-commerce solution with product catalog, shopping cart, and checkout",
-          status: "in_progress"
-        },
-        {
-          name: "Task Management System",
-          description: "A project management tool with task tracking and team collaboration features",
-          status: "planning"
-        },
-        {
-          name: "Personal Finance App",
-          description: "Application for tracking expenses, budgeting, and financial goal planning",
-          status: "review"
-        }
-      ];
-      
-      const createdProjects = [];
-      for (const project of sampleProjects) {
-        const createdProject = await this.createProject(project);
-        createdProjects.push(createdProject);
-      }
-      
-      // Initialize with sample tasks after agents are created
-      const sampleTasks = [
-        { 
-          title: "Build User Authentication Component", 
-          description: "Create login, registration and password reset components", 
-          status: "in_progress", 
-          priority: "high", 
-          assignedTo: 2, // Builder 
-          estimatedTime: 30,
-          projectId: createdProjects[0].id // E-commerce Platform
-        },
-        { 
-          title: "Fix API Integration Issues", 
-          description: "Fix issues with third-party API integration", 
-          status: "debugging", 
-          priority: "medium", 
-          assignedTo: 3, // Debugger 
-          estimatedTime: 45,
-          projectId: createdProjects[0].id // E-commerce Platform
-        },
-        { 
-          title: "Verify Form Validation Logic", 
-          description: "Ensure all form validations work correctly", 
-          status: "queued", 
-          priority: "low", 
-          assignedTo: 4, // Verifier 
-          estimatedTime: 60,
-          projectId: createdProjects[0].id // E-commerce Platform
-        },
-        { 
-          title: "Design Task Creation Interface", 
-          description: "Create intuitive UI for creating and assigning tasks", 
-          status: "in_progress", 
-          priority: "medium", 
-          assignedTo: 2, // Builder 
-          estimatedTime: 20,
-          projectId: createdProjects[1].id // Task Management System
-        },
-        { 
-          title: "Setup Real-time Collaboration", 
-          description: "Implement WebSocket for real-time task updates", 
-          status: "queued", 
-          priority: "high", 
-          assignedTo: 2, // Builder 
-          estimatedTime: 40,
-          projectId: createdProjects[1].id // Task Management System
-        }
-      ];
-      
-      for (const task of sampleTasks) {
-        await this.createTask(task);
-      }
-      
-      // Initialize sample logs
-      const now = new Date();
-      const sampleLogs = [
-        { 
-          agentId: 2, 
-          type: "info", 
-          message: "Builder agent initialized. Ready to process tasks.", 
-        },
-        { 
-          agentId: 1, 
-          type: "info", 
-          message: "Assigning task: Build User Authentication Component", 
-        },
-        { 
-          agentId: 2, 
-          type: "info", 
-          message: "Task received. Beginning component architecture planning.", 
-        },
-        // Add conversation logs
-        {
-          agentId: 1,
-          targetAgentId: 2,
-          type: "conversation",
-          projectId: createdProjects[0].id,
-          message: "I need you to build a secure authentication system for our e-commerce platform.",
-          details: "Requirements:\n- Login/Logout\n- Registration with email verification\n- Password reset\n- Remember me functionality\n- OAuth integration"
-        },
-        {
-          agentId: 2,
-          targetAgentId: 1,
-          type: "conversation",
-          projectId: createdProjects[0].id,
-          message: "I'll implement the authentication system. What security requirements should I consider?",
-          details: null
-        },
-        {
-          agentId: 1,
-          targetAgentId: 2,
-          type: "conversation",
-          projectId: createdProjects[0].id,
-          message: "Ensure you're using secure password hashing with bcrypt, HTTPS for all auth routes, and implement rate limiting to prevent brute force attacks.",
-          details: "Additional security considerations:\n- JWT with short expiration\n- Secure HTTP-only cookies\n- CSRF protection\n- Input validation"
-        },
-        {
-          agentId: 2,
-          targetAgentId: 1,
-          type: "conversation",
-          projectId: createdProjects[0].id,
-          message: "Understood. I'll implement these security measures. Will start with the core authentication endpoints and password hashing logic.",
-          details: null
-        },
-        {
-          agentId: 1,
-          targetAgentId: 3,
-          type: "conversation",
-          projectId: createdProjects[0].id,
-          message: "Debugger, once the authentication component is ready, prioritize security testing and look for common vulnerabilities.",
-          details: "Focus areas:\n- SQL injection\n- XSS vulnerabilities\n- Authentication bypass\n- Session management issues"
-        },
-        {
-          agentId: 3, 
-          targetAgentId: 1,
-          type: "conversation",
-          projectId: createdProjects[0].id,
-          message: "Will do. I'll create a comprehensive test suite for security vulnerabilities and edge cases for the authentication flow.",
-          details: null
-        }
-      ];
-      
-      for (const log of sampleLogs) {
-        await this.createLog(log);
-      }
-      
-      // Initialize sample issues
-      const sampleIssues = [
-        { 
-          taskId: 1, 
-          type: "error", 
-          title: "Undefined variable 'isAuthenticated'", 
-          description: "Undefined variable 'isAuthenticated' when checking authentication state", 
-          code: "useEffect(() => {\n  if (isAuthenticated) {  // <-- Error here\n    navigate('/dashboard');\n  }\n}, [user]);", 
-          solution: "useEffect(() => {\n  if (user !== null) {\n    navigate('/dashboard');\n  }\n}, [user]);", 
-        },
-        { 
-          taskId: 1, 
-          type: "warning", 
-          title: "Missing dependencies in useEffect", 
-          description: "React Hook useEffect has missing dependencies: 'token' and 'user'", 
-          code: "useEffect(() => {\n  // Some logic using token and user\n}, []);", 
-          solution: "Consider adding these variables to the dependency array to ensure proper reactivity.", 
-        }
-      ];
-      
-      for (const issue of sampleIssues) {
-        await this.createIssue(issue);
       }
     }
   }
