@@ -1,63 +1,67 @@
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { analyzeCode, generateCode, verifyImplementation } from "@/lib/aiService";
 import { useToast } from "@/hooks/use-toast";
 
 export function CodePlayground() {
   const [activeTab, setActiveTab] = useState("generate");
-  const [language, setLanguage] = useState("javascript");
-  const [framework, setFramework] = useState("");
   const [specification, setSpecification] = useState("");
+  const [language, setLanguage] = useState("JavaScript");
+  const [framework, setFramework] = useState("");
   const [codeToAnalyze, setCodeToAnalyze] = useState("");
+  const [codeContext, setCodeContext] = useState("");
+  const [requirements, setRequirements] = useState("");
+  const [implementation, setImplementation] = useState("");
+  const [testCases, setTestCases] = useState("");
+  
   const [generatedCode, setGeneratedCode] = useState("");
-  const [analyzeContext, setAnalyzeContext] = useState("");
-  const [analyzeResult, setAnalyzeResult] = useState<{
-    issues: any[];
+  const [analysisResult, setAnalysisResult] = useState<{
+    issues: Array<{
+      type: string;
+      title: string;
+      description: string;
+      code?: string;
+      solution?: string;
+    }>;
     suggestions: string[];
   } | null>(null);
-  const [requirementsToVerify, setRequirementsToVerify] = useState("");
-  const [implementationToVerify, setImplementationToVerify] = useState("");
   const [verificationResult, setVerificationResult] = useState<{
     passed: boolean;
     score: number;
     feedback: string;
     issues: string[];
   } | null>(null);
+  
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-
-  const handleLanguageChange = (value: string) => {
-    setLanguage(value);
-  };
-
-  const handleFrameworkChange = (value: string) => {
-    setFramework(value);
-  };
 
   const handleGenerateCode = async () => {
     if (!specification.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a specification",
+        title: "Empty specification",
+        description: "Please enter a specification for code generation.",
         variant: "destructive",
       });
       return;
     }
-
+    
     setIsLoading(true);
-
     try {
-      const code = await generateCode(specification, language, framework);
-      setGeneratedCode(code);
+      const result = await generateCode(specification, {
+        language,
+        framework: framework.trim() || undefined,
+        existingCode: ""
+      });
+      
+      setGeneratedCode(result);
     } catch (error) {
       console.error("Error generating code:", error);
       toast({
-        title: "Error",
-        description: "Failed to generate code",
+        title: "Generation failed",
+        description: "Failed to generate code. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -68,23 +72,26 @@ export function CodePlayground() {
   const handleAnalyzeCode = async () => {
     if (!codeToAnalyze.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter code to analyze",
+        title: "Empty code",
+        description: "Please enter code to analyze.",
         variant: "destructive",
       });
       return;
     }
-
+    
     setIsLoading(true);
-
     try {
-      const result = await analyzeCode(codeToAnalyze, analyzeContext);
-      setAnalyzeResult(result);
+      const result = await analyzeCode({
+        code: codeToAnalyze,
+        context: codeContext.trim() || "General code review"
+      });
+      
+      setAnalysisResult(result);
     } catch (error) {
       console.error("Error analyzing code:", error);
       toast({
-        title: "Error",
-        description: "Failed to analyze code",
+        title: "Analysis failed",
+        description: "Failed to analyze code. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -93,25 +100,29 @@ export function CodePlayground() {
   };
 
   const handleVerifyImplementation = async () => {
-    if (!requirementsToVerify.trim() || !implementationToVerify.trim()) {
+    if (!requirements.trim() || !implementation.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter both requirements and implementation",
+        title: "Missing information",
+        description: "Please enter both requirements and implementation.",
         variant: "destructive",
       });
       return;
     }
-
+    
     setIsLoading(true);
-
     try {
-      const result = await verifyImplementation(requirementsToVerify, implementationToVerify);
+      const result = await verifyImplementation({
+        requirements, 
+        implementation,
+        testCases: testCases.trim() ? testCases.split("\n").filter(Boolean) : undefined
+      });
+      
       setVerificationResult(result);
     } catch (error) {
       console.error("Error verifying implementation:", error);
       toast({
-        title: "Error",
-        description: "Failed to verify implementation",
+        title: "Verification failed",
+        description: "Failed to verify implementation. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -119,168 +130,136 @@ export function CodePlayground() {
     }
   };
 
-  // Framework options based on selected language
-  const getFrameworkOptions = () => {
-    switch (language) {
-      case "javascript":
-      case "typescript":
-        return (
-          <>
-            <SelectItem value="">None</SelectItem>
-            <SelectItem value="react">React</SelectItem>
-            <SelectItem value="vue">Vue</SelectItem>
-            <SelectItem value="angular">Angular</SelectItem>
-            <SelectItem value="express">Express</SelectItem>
-            <SelectItem value="nextjs">Next.js</SelectItem>
-          </>
-        );
-      case "python":
-        return (
-          <>
-            <SelectItem value="">None</SelectItem>
-            <SelectItem value="flask">Flask</SelectItem>
-            <SelectItem value="django">Django</SelectItem>
-            <SelectItem value="fastapi">FastAPI</SelectItem>
-          </>
-        );
-      case "java":
-        return (
-          <>
-            <SelectItem value="">None</SelectItem>
-            <SelectItem value="spring">Spring</SelectItem>
-            <SelectItem value="springboot">Spring Boot</SelectItem>
-          </>
-        );
-      default:
-        return <SelectItem value="">None</SelectItem>;
-    }
-  };
-
   return (
-    <Card className="h-full">
-      <CardContent className="p-5">
-        <div className="mb-5">
-          <h2 className="text-lg font-medium text-neutral-800">Code Playground</h2>
-          <p className="text-sm text-neutral-600">
-            Generate, analyze, and verify code using AI agents
-          </p>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-semibold">Code Playground</CardTitle>
+      </CardHeader>
+      <CardContent className="flex-grow flex flex-col">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={setActiveTab}
+          className="flex-grow flex flex-col"
+        >
+          <TabsList className="mb-4">
             <TabsTrigger value="generate">Generate</TabsTrigger>
             <TabsTrigger value="analyze">Analyze</TabsTrigger>
             <TabsTrigger value="verify">Verify</TabsTrigger>
           </TabsList>
-
+          
           {/* Generate Code Tab */}
-          <TabsContent value="generate" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TabsContent value="generate" className="flex-grow flex flex-col">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">Language</label>
-                <Select value={language} onValueChange={handleLanguageChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="javascript">JavaScript</SelectItem>
-                    <SelectItem value="typescript">TypeScript</SelectItem>
-                    <SelectItem value="python">Python</SelectItem>
-                    <SelectItem value="java">Java</SelectItem>
-                    <SelectItem value="go">Go</SelectItem>
-                    <SelectItem value="rust">Rust</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select 
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="JavaScript">JavaScript</option>
+                  <option value="TypeScript">TypeScript</option>
+                  <option value="Python">Python</option>
+                  <option value="Java">Java</option>
+                  <option value="C#">C#</option>
+                  <option value="Go">Go</option>
+                  <option value="Rust">Rust</option>
+                </select>
               </div>
-
               <div>
-                <label className="text-sm font-medium mb-1 block">Framework (Optional)</label>
-                <Select value={framework} onValueChange={handleFrameworkChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select framework (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getFrameworkOptions()}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium mb-1 block">Framework (optional)</label>
+                <input 
+                  type="text"
+                  value={framework}
+                  onChange={(e) => setFramework(e.target.value)}
+                  placeholder="e.g., React, Express, Django..."
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
               </div>
             </div>
-
-            <div>
+            
+            <div className="mb-4 flex-grow flex flex-col">
               <label className="text-sm font-medium mb-1 block">Specification</label>
               <Textarea
-                placeholder="Enter code specification details..."
                 value={specification}
                 onChange={(e) => setSpecification(e.target.value)}
-                className="min-h-[150px] font-medium"
+                placeholder="Describe what you want the code to do..."
+                className="flex-grow"
               />
             </div>
-
-            <div className="flex justify-end">
-              <Button onClick={handleGenerateCode} disabled={isLoading}>
-                {isLoading ? "Generating..." : "Generate Code"}
-              </Button>
-            </div>
-
+            
+            <Button 
+              onClick={handleGenerateCode}
+              disabled={isLoading || !specification.trim()}
+              className="self-end"
+            >
+              {isLoading ? "Generating..." : "Generate Code"}
+            </Button>
+            
             {generatedCode && (
-              <div>
-                <h3 className="text-sm font-medium mb-1">Generated Code:</h3>
-                <div className="bg-neutral-100 p-3 rounded-md border border-neutral-200 font-mono text-sm overflow-auto max-h-[300px]">
-                  <pre>{generatedCode}</pre>
-                </div>
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Generated Code:</h3>
+                <pre className="bg-neutral-50 p-4 rounded-md border overflow-auto whitespace-pre-wrap max-h-[400px]">
+                  {generatedCode}
+                </pre>
               </div>
             )}
           </TabsContent>
-
+          
           {/* Analyze Code Tab */}
-          <TabsContent value="analyze" className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Code Context (Optional)</label>
-              <Textarea
-                placeholder="Provide context for the code analysis..."
-                value={analyzeContext}
-                onChange={(e) => setAnalyzeContext(e.target.value)}
-                className="min-h-[60px]"
+          <TabsContent value="analyze" className="flex-grow flex flex-col">
+            <div className="mb-4">
+              <label className="text-sm font-medium mb-1 block">Context (optional)</label>
+              <input 
+                type="text"
+                value={codeContext}
+                onChange={(e) => setCodeContext(e.target.value)}
+                placeholder="e.g., Performance review, security audit..."
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
               />
             </div>
-
-            <div>
+            
+            <div className="mb-4 flex-grow flex flex-col">
               <label className="text-sm font-medium mb-1 block">Code to Analyze</label>
               <Textarea
-                placeholder="Enter code to analyze..."
                 value={codeToAnalyze}
                 onChange={(e) => setCodeToAnalyze(e.target.value)}
-                className="min-h-[150px] font-mono"
+                placeholder="Paste the code you want to analyze..."
+                className="flex-grow"
               />
             </div>
-
-            <div className="flex justify-end">
-              <Button onClick={handleAnalyzeCode} disabled={isLoading}>
-                {isLoading ? "Analyzing..." : "Analyze Code"}
-              </Button>
-            </div>
-
-            {analyzeResult && (
-              <div className="space-y-3">
-                {analyzeResult.issues.length > 0 && (
+            
+            <Button 
+              onClick={handleAnalyzeCode}
+              disabled={isLoading || !codeToAnalyze.trim()}
+              className="self-end"
+            >
+              {isLoading ? "Analyzing..." : "Analyze Code"}
+            </Button>
+            
+            {analysisResult && (
+              <div className="mt-4 space-y-4">
+                {analysisResult.issues.length > 0 ? (
                   <div>
-                    <h3 className="text-sm font-medium mb-1">Issues:</h3>
-                    <div className="space-y-2">
-                      {analyzeResult.issues.map((issue, i) => (
-                        <div key={i} className="p-2 rounded-md bg-neutral-100 border border-neutral-200">
-                          <div className="flex justify-between">
-                            <span className={`text-sm font-medium ${issue.type === 'error' ? 'text-error' : 'text-warning'}`}>
-                              {issue.title}
-                            </span>
-                            <span className="text-xs bg-neutral-200 px-2 py-0.5 rounded">
-                              {issue.type}
+                    <h3 className="text-sm font-medium mb-2">Issues Found:</h3>
+                    <div className="space-y-3">
+                      {analysisResult.issues.map((issue, idx) => (
+                        <div key={idx} className={`p-3 rounded-md border ${issue.type === 'error' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                          <div className="flex justify-between mb-1">
+                            <span className={`text-sm font-medium ${issue.type === 'error' ? 'text-red-800' : 'text-yellow-800'}`}>
+                              {issue.type === 'error' ? '🐞 Error: ' : '⚠️ Warning: '}{issue.title}
                             </span>
                           </div>
-                          <p className="text-sm mt-1">{issue.description}</p>
+                          <p className="text-sm">{issue.description}</p>
+                          {issue.code && (
+                            <pre className="mt-2 text-xs p-2 bg-white/70 rounded border border-current/10 overflow-x-auto">
+                              {issue.code}
+                            </pre>
+                          )}
                           {issue.solution && (
                             <div className="mt-2">
-                              <p className="text-xs text-success font-medium">Suggested solution:</p>
-                              <pre className="text-xs bg-neutral-800 text-neutral-100 p-2 rounded mt-1 overflow-x-auto">
+                              <span className="text-xs font-medium">Suggested solution:</span>
+                              <pre className="mt-1 text-xs p-2 bg-white/70 rounded border border-current/10 overflow-x-auto">
                                 {issue.solution}
                               </pre>
                             </div>
@@ -289,85 +268,106 @@ export function CodePlayground() {
                       ))}
                     </div>
                   </div>
-                )}
-
-                {analyzeResult.suggestions.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium mb-1">Suggestions:</h3>
-                    <ul className="list-disc list-inside pl-2">
-                      {analyzeResult.suggestions.map((suggestion, i) => (
-                        <li key={i} className="text-sm text-neutral-700">{suggestion}</li>
-                      ))}
-                    </ul>
+                ) : (
+                  <div className="p-3 rounded-md border bg-green-50 border-green-200 text-green-800">
+                    <p>✅ No issues found in the code!</p>
                   </div>
                 )}
-
-                {analyzeResult.issues.length === 0 && analyzeResult.suggestions.length === 0 && (
-                  <div className="text-sm text-success">
-                    No issues or suggestions found. The code looks good!
+                
+                {analysisResult.suggestions.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Suggestions:</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {analysisResult.suggestions.map((suggestion, idx) => (
+                        <li key={idx} className="text-sm">{suggestion}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
             )}
           </TabsContent>
-
+          
           {/* Verify Implementation Tab */}
-          <TabsContent value="verify" className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Requirements</label>
-              <Textarea
-                placeholder="Enter the requirements or specifications..."
-                value={requirementsToVerify}
-                onChange={(e) => setRequirementsToVerify(e.target.value)}
-                className="min-h-[100px]"
-              />
+          <TabsContent value="verify" className="flex-grow flex flex-col">
+            <div className="grid grid-cols-1 gap-4 mb-4 flex-grow">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Requirements</label>
+                <Textarea
+                  value={requirements}
+                  onChange={(e) => setRequirements(e.target.value)}
+                  placeholder="Enter the requirements or specifications..."
+                  className="h-28"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Implementation</label>
+                <Textarea
+                  value={implementation}
+                  onChange={(e) => setImplementation(e.target.value)}
+                  placeholder="Enter the implementation code to verify..."
+                  className="h-28"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Test Cases (optional, one per line)</label>
+                <Textarea
+                  value={testCases}
+                  onChange={(e) => setTestCases(e.target.value)}
+                  placeholder="Enter test cases or expected behaviors..."
+                  className="h-28"
+                />
+              </div>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-1 block">Implementation</label>
-              <Textarea
-                placeholder="Enter the implementation to verify..."
-                value={implementationToVerify}
-                onChange={(e) => setImplementationToVerify(e.target.value)}
-                className="min-h-[150px] font-mono"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={handleVerifyImplementation} disabled={isLoading}>
-                {isLoading ? "Verifying..." : "Verify Implementation"}
-              </Button>
-            </div>
-
+            
+            <Button 
+              onClick={handleVerifyImplementation}
+              disabled={isLoading || !requirements.trim() || !implementation.trim()}
+              className="self-end"
+            >
+              {isLoading ? "Verifying..." : "Verify Implementation"}
+            </Button>
+            
             {verificationResult && (
-              <div className="p-3 rounded-md border space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className={`p-1.5 rounded-full ${verificationResult.passed ? 'bg-success' : 'bg-error'}`}></div>
-                    <h3 className="text-sm font-medium">
-                      {verificationResult.passed ? "Pass" : "Fail"}
-                    </h3>
+              <div className="mt-4">
+                <div className={`p-4 rounded-md border mb-3 ${
+                  verificationResult.passed 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className={`text-sm font-medium ${
+                      verificationResult.passed ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                      {verificationResult.passed ? '✅ Verification Passed' : '❌ Verification Failed'}
+                    </span>
+                    <span className="text-sm font-medium">
+                      Score: {verificationResult.score}/100
+                    </span>
                   </div>
-                  <div className="text-sm">
-                    Score: <span className="font-medium">{verificationResult.score}%</span>
+                  
+                  <div className="h-2 w-full bg-gray-200 rounded-full mb-3">
+                    <div 
+                      className={`h-2 rounded-full ${
+                        verificationResult.score >= 70 ? 'bg-green-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${verificationResult.score}%` }}
+                    />
                   </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-1">Feedback:</h3>
+                  
                   <p className="text-sm">{verificationResult.feedback}</p>
+                  
+                  {verificationResult.issues.length > 0 && (
+                    <div className="mt-3">
+                      <span className="text-xs font-medium">Issues to address:</span>
+                      <ul className="list-disc pl-5 mt-1 space-y-1">
+                        {verificationResult.issues.map((issue, idx) => (
+                          <li key={idx} className="text-xs">{issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-
-                {verificationResult.issues.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium mb-1">Issues to Address:</h3>
-                    <ul className="list-disc list-inside pl-2">
-                      {verificationResult.issues.map((issue, i) => (
-                        <li key={i} className="text-sm text-neutral-700">{issue}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             )}
           </TabsContent>

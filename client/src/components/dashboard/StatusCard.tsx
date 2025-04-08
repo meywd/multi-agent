@@ -1,4 +1,5 @@
-import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import React from "react";
 
 interface StatusCardProps {
   title: string;
@@ -15,68 +16,45 @@ export function StatusCard({
   icon,
   color,
   subtitle,
-  progress
+  progress,
 }: StatusCardProps) {
-  const getColorClasses = (color: string) => {
-    const colorMap = {
-      primary: {
-        bg: "bg-primary-light bg-opacity-10",
-        text: "text-primary",
-        progressBg: "bg-primary"
-      },
-      secondary: {
-        bg: "bg-secondary-light bg-opacity-10",
-        text: "text-secondary",
-        progressBg: "bg-secondary"
-      },
-      warning: {
-        bg: "bg-warning bg-opacity-10",
-        text: "text-warning",
-        progressBg: "bg-warning"
-      },
-      error: {
-        bg: "bg-error bg-opacity-10",
-        text: "text-error",
-        progressBg: "bg-error"
-      },
-      success: {
-        bg: "bg-success bg-opacity-10",
-        text: "text-success",
-        progressBg: "bg-success"
-      }
-    };
-    
-    return colorMap[color as keyof typeof colorMap] || colorMap.primary;
+  const colorClasses = {
+    primary: "bg-blue-50 text-blue-500 border-blue-200",
+    secondary: "bg-purple-50 text-purple-500 border-purple-200",
+    warning: "bg-yellow-50 text-yellow-500 border-yellow-200",
+    error: "bg-red-50 text-red-500 border-red-200",
+    success: "bg-green-50 text-green-500 border-green-200",
   };
-  
-  const colorClasses = getColorClasses(color);
-  
+
+  const progressColorClasses = {
+    primary: "bg-blue-500",
+    secondary: "bg-purple-500",
+    warning: "bg-yellow-500",
+    error: "bg-red-500",
+    success: "bg-green-500",
+  };
+
   return (
-    <div className="bg-white shadow-sm rounded-lg p-5 border border-neutral-200">
-      <div className="flex items-center">
-        <div className={cn("p-3 rounded-md", colorClasses.bg)}>
-          {icon}
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex justify-between mb-3">
+          <div className="text-sm font-medium text-neutral-700">{title}</div>
+          <div className={`p-2 rounded-full ${colorClasses[color]}`}>{icon}</div>
         </div>
-        <div className="ml-4">
-          <h3 className="text-sm font-medium text-neutral-500">{title}</h3>
-          <p className="text-2xl font-semibold text-neutral-900">{value}</p>
-        </div>
-      </div>
-      {progress !== undefined && (
-        <div className="mt-4">
-          <div className="w-full bg-neutral-200 rounded-full h-2">
-            <div 
-              className={cn("h-2 rounded-full", colorClasses.progressBg)} 
-              style={{ width: `${progress}%` }}
+
+        <div className="text-2xl font-bold text-neutral-900 mb-1">{value}</div>
+
+        {subtitle && <div className="text-xs text-neutral-600">{subtitle}</div>}
+
+        {typeof progress === "number" && (
+          <div className="mt-3 w-full bg-neutral-100 rounded-full h-1.5">
+            <div
+              className={`h-1.5 rounded-full ${progressColorClasses[color]}`}
+              style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
             ></div>
           </div>
-        </div>
-      )}
-      {subtitle && (
-        <div className="mt-4 flex items-center">
-          {subtitle}
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
