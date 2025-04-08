@@ -63,6 +63,15 @@ export async function getAgentResponse(
       });
       contextMessage += "\n";
     }
+    
+    if (context.allProjects && context.allProjects.length > 0) {
+      contextMessage += "Current projects:\n";
+      context.allProjects.forEach((project: any) => {
+        const createdDate = new Date(project.createdAt).toLocaleDateString();
+        contextMessage += `- Project #${project.id}: ${project.name} (Status: ${project.status}, Created: ${createdDate})\n`;
+      });
+      contextMessage += "\n";
+    }
 
     // Get completion from OpenAI
     const response = await openai.chat.completions.create({

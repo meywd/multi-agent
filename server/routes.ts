@@ -402,16 +402,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Gather context if requested
       let context = {};
       if (includeContext) {
-        const [recentLogs, relatedTasks, relatedIssues] = await Promise.all([
+        const [recentLogs, relatedTasks, relatedIssues, projects] = await Promise.all([
           storage.getLogsByAgent(agentId),
           storage.getTasksByAgent(agentId),
-          storage.getIssues() // Filter relevant issues in the frontend
+          storage.getIssues(), // Filter relevant issues in the frontend
+          storage.getProjects() // Include all projects
         ]);
         
         context = {
           recentLogs: recentLogs.slice(0, 10), // Last 10 logs
           relatedTasks,
-          relatedIssues
+          relatedIssues,
+          allProjects: projects // Add all projects to context
         };
       }
       
