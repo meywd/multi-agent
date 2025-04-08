@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { getAgents } from "@/lib/agentService";
+import { queryAgent } from "@/lib/aiService";
 import { 
   Card, 
   CardContent, 
@@ -21,15 +22,33 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { insertAgentSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 const agentSchema = insertAgentSchema.extend({
   name: z.string().min(2, "Agent name must be at least 2 characters"),
   description: z.string().min(10, "Agent description must be at least 10 characters").optional(),
 });
 
+// Message schema for agent communication
+const messageSchema = z.object({
+  message: z.string().min(1, "Message cannot be empty"),
+});
+
+type Message = {
+  id: string;
+  content: string;
+  sender: 'user' | 'agent';
+  timestamp: Date;
+};
+
 export default function AgentsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoadingResponse, setIsLoadingResponse] = useState(false);
 
   const form = useForm<z.infer<typeof agentSchema>>({
     resolver: zodResolver(agentSchema),
@@ -40,9 +59,48 @@ export default function AgentsPage() {
       status: "offline",
     },
   });
+  
+  const chatForm = useForm<z.infer<typeof messageSchema>>({
+    resolver: zodResolver(messageSchema),
+    defaultValues: {
+      message: "",
+    },
+  });
 
-  const { data: agents = [], isLoading } = useQuery({
+  const { data: agents = [], isLoading } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
+  });
+  
+  // Query agent mutation
+  const agentQueryMutation = useMutation({
+    mutationFn: (data: { agentId: number, query: string }) => {
+      return queryAgent({
+        agentId: data.agentId,
+        prompt: data.query
+      });
+    },
+    onSuccess: (data) => {
+      // Add agent response to messages
+      if (selectedAgent) {
+        const newMessage: Message = {
+          id: `agent-${Date.now()}`,
+          content: data,
+          sender: 'agent',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, newMessage]);
+      }
+      setIsLoadingResponse(false);
+    },
+    onError: (error) => {
+      console.error("Error querying agent:", error);
+      toast({
+        title: "Communication Error",
+        description: "Failed to get a response from the agent. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoadingResponse(false);
+    }
   });
 
   const handleSubmit = async (values: z.infer<typeof agentSchema>) => {
@@ -69,6 +127,54 @@ export default function AgentsPage() {
     }
   };
 
+  // Handle chat message submission
+  const handleChatSubmit = async (values: z.infer<typeof messageSchema>) => {
+    if (!selectedAgent) return;
+    
+    // Add user message to chat
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      content: values.message,
+      sender: 'user',
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    chatForm.reset();
+    
+    // Show loading indicator
+    setIsLoadingResponse(true);
+    
+    // Send message to agent
+    agentQueryMutation.mutate({
+      agentId: selectedAgent.id, 
+      query: values.message
+    });
+  };
+  
+  // Handle opening the chat dialog
+  const handleOpenChat = (agent: Agent) => {
+    setSelectedAgent(agent);
+    setMessages([]);
+    setIsChatOpen(true);
+    
+    // Add initial welcome message from agent
+    const welcomeMessage: Message = {
+      id: `agent-welcome-${Date.now()}`,
+      content: `Hello, I'm ${agent.name}, your ${agent.role} agent. How can I assist you today?`,
+      sender: 'agent',
+      timestamp: new Date()
+    };
+    setMessages([welcomeMessage]);
+  };
+  
+  // Handle closing the chat dialog
+  const handleCloseChat = () => {
+    setIsChatOpen(false);
+    setSelectedAgent(null);
+    setMessages([]);
+  };
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case "online":
@@ -241,19 +347,24 @@ export default function AgentsPage() {
                     {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
                   </Badge>
                 </div>
-                <CardDescription className="text-xs sm:text-sm flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-1 text-muted-foreground text-xs sm:text-sm">
                   <Badge className={`text-xs ${getRoleColor(agent.role)}`}>
                     {agent.role.charAt(0).toUpperCase() + agent.role.slice(1)}
                   </Badge>
                   <span>Created: {new Date(agent.createdAt).toLocaleDateString()}</span>
-                </CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-1">
                 <p className="text-xs sm:text-sm text-gray-700 line-clamp-3">
                   {agent.description || "No description provided."}
                 </p>
                 <div className="mt-3 sm:mt-4 flex justify-end">
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-xs sm:text-sm"
+                    onClick={() => handleOpenChat(agent)}
+                  >
                     Communicate
                   </Button>
                 </div>
@@ -262,6 +373,90 @@ export default function AgentsPage() {
           ))}
         </div>
       )}
+      
+      {/* Agent Chat Dialog */}
+      <Dialog open={isChatOpen} onOpenChange={(open) => {
+        if (!open) handleCloseChat();
+      }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedAgent && (
+                <div className="flex items-center gap-2">
+                  <span>Chat with {selectedAgent.name}</span>
+                  <Badge className={`text-xs ${getRoleColor(selectedAgent.role)}`}>
+                    {selectedAgent.role.charAt(0).toUpperCase() + selectedAgent.role.slice(1)}
+                  </Badge>
+                </div>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              {selectedAgent?.description || "Ask any questions to get assistance with your tasks."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Chat Messages */}
+          <ScrollArea className="flex-grow border rounded-md p-3 my-2 h-[300px]">
+            {messages.map((message) => (
+              <div 
+                key={message.id} 
+                className={`mb-3 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}
+              >
+                <div 
+                  className={`inline-block p-3 rounded-lg text-xs sm:text-sm max-w-[80%] ${
+                    message.sender === 'user' 
+                      ? 'bg-primary text-primary-foreground ml-auto' 
+                      : 'bg-muted text-muted-foreground mr-auto'
+                  }`}
+                >
+                  {message.content}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  {message.timestamp.toLocaleTimeString()}
+                </div>
+              </div>
+            ))}
+            {isLoadingResponse && (
+              <div className="text-left mb-3">
+                <div className="inline-block p-3 rounded-lg text-xs sm:text-sm bg-muted text-muted-foreground animate-pulse">
+                  Agent is typing...
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+          
+          {/* Chat Input */}
+          <Form {...chatForm}>
+            <form onSubmit={chatForm.handleSubmit(handleChatSubmit)} className="flex gap-2">
+              <FormField
+                control={chatForm.control}
+                name="message"
+                render={({ field }) => (
+                  <FormItem className="flex-grow">
+                    <FormControl>
+                      <Input 
+                        placeholder="Type your message..." 
+                        {...field} 
+                        className="text-xs sm:text-sm"
+                        disabled={isLoadingResponse}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+              <Button 
+                type="submit" 
+                size="sm" 
+                className="text-xs sm:text-sm"
+                disabled={isLoadingResponse}
+              >
+                Send
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
