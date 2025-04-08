@@ -1,6 +1,7 @@
 import { Route, Switch, useLocation } from "wouter";
 import Dashboard from "@/pages/dashboard";
 import TestPage from "@/pages/test";
+import PlaygroundPage from "@/pages/playground";
 import NotFound from "@/pages/not-found";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
@@ -17,6 +18,7 @@ function App() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/test" component={TestPage} />
+            <Route path="/playground" component={PlaygroundPage} />
             <Route component={NotFound} />
           </Switch>
         </main>

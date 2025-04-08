@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CodePlayground } from "@/components/dashboard/CodePlayground";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const [showCodePlayground, setShowCodePlayground] = useState(false);
@@ -11,7 +12,7 @@ export default function Dashboard() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-neutral-900">AI Agent Dashboard</h1>
         <p className="text-sm text-neutral-600 mt-1">
-          Simplified dashboard for troubleshooting
+          Multi-agent AI system for application development
         </p>
       </div>
 
@@ -20,8 +21,8 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-2">Dashboard Status</h3>
             <p className="text-neutral-600 mb-4">
-              This is a simplified dashboard for troubleshooting. The full dashboard functionality 
-              has been temporarily disabled.
+              Welcome to the multi-agent AI system. This platform enables AI agents to collaborate
+              on building, debugging, and verifying applications.
             </p>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-green-500"></div>
@@ -32,23 +33,9 @@ export default function Dashboard() {
         
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-2">Connection Status</h3>
-            <p className="text-neutral-600 mb-4">
-              There seems to be an issue with the WebSocket connection. We're using a simplified
-              dashboard without real-time updates for now.
-            </p>
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
-              <span className="text-sm">Limited functionality</span>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-2">Available Tools</h3>
             <p className="text-neutral-600 mb-4">
-              Some tools are still available for testing purposes.
+              Generate code, analyze implementations, and test specifications using our AI-powered tools.
             </p>
             <Button 
               onClick={() => setShowCodePlayground(!showCodePlayground)}
@@ -56,6 +43,27 @@ export default function Dashboard() {
             >
               {showCodePlayground ? "Hide Code Playground" : "Show Code Playground"}
             </Button>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-2">Quick Navigation</h3>
+            <p className="text-neutral-600 mb-4">
+              Use our simplified navigation to explore the application.
+            </p>
+            <div className="space-y-2">
+              <Link href="/test">
+                <Button variant="outline" className="w-full">
+                  Test Page
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button variant="outline" className="w-full">
+                  Dashboard
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>
