@@ -39,7 +39,7 @@ export function Sidebar() {
       isActive: location === "/"
     },
     {
-      name: "Test Page",
+      name: "Projects",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -51,16 +51,14 @@ export function Sidebar() {
           strokeLinejoin="round"
           className="h-5 w-5"
         >
-          <path d="M17 6H3" />
-          <path d="M17 12H3" />
-          <path d="M17 18H3" />
-          <path d="M21 6v.01" />
-          <path d="M21 12v.01" />
-          <path d="M21 18v.01" />
+          <path d="M3 3h18v18H3z" />
+          <path d="M13 7H8v9h9v-5" />
+          <path d="M13 7V3" />
+          <path d="M13 7h5" />
         </svg>
       ),
-      href: "/test",
-      isActive: location === "/test"
+      href: "/projects",
+      isActive: location === "/projects"
     },
     {
       name: "Agents",

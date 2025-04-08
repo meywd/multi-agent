@@ -1,6 +1,6 @@
 import { Route, Switch, useLocation } from "wouter";
 import Dashboard from "@/pages/dashboard";
-import TestPage from "@/pages/test";
+import ProjectsPage from "@/pages/projects";
 import PlaygroundPage from "@/pages/playground";
 import NotFound from "@/pages/not-found";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -17,7 +17,7 @@ function App() {
         <main className="flex-1 overflow-y-auto bg-neutral-100 p-6">
           <Switch>
             <Route path="/" component={Dashboard} />
-            <Route path="/test" component={TestPage} />
+            <Route path="/projects" component={ProjectsPage} />
             <Route path="/playground" component={PlaygroundPage} />
             <Route component={NotFound} />
           </Switch>
