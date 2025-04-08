@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CodePlayground } from "@/components/dashboard/CodePlayground";
+import ProjectsSection from "@/components/dashboard/ProjectsSection";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -66,6 +67,11 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Projects Section */}
+      <div className="mb-8">
+        <ProjectsSection />
       </div>
 
       {showCodePlayground && (
