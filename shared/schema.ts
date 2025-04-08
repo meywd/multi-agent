@@ -74,6 +74,7 @@ export const taskPriorityEnum = pgEnum("task_priority", [
 // Task schema
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => projects.id),
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").notNull().default("queued"),
@@ -86,6 +87,7 @@ export const tasks = pgTable("tasks", {
 });
 
 export const insertTaskSchema = createInsertSchema(tasks).pick({
+  projectId: true,
   title: true,
   description: true,
   status: true,
@@ -156,3 +158,32 @@ export const insertIssueSchema = createInsertSchema(issues).pick({
 
 export type InsertIssue = z.infer<typeof insertIssueSchema>;
 export type Issue = typeof issues.$inferSelect;
+
+// Project Status Enum
+export const projectStatusEnum = pgEnum("project_status", [
+  "planning",
+  "in_progress",
+  "review",
+  "completed",
+  "archived"
+]);
+
+// Project schema
+export const projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("planning"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertProjectSchema = createInsertSchema(projects).pick({
+  name: true,
+  description: true,
+  status: true,
+});
+
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Project = typeof projects.$inferSelect;

@@ -9,11 +9,14 @@ import {
   InsertIssue,
   User,
   InsertUser,
+  Project,
+  InsertProject,
   users,
   agents,
   tasks,
   logs,
-  issues
+  issues,
+  projects
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -51,6 +54,13 @@ export interface IStorage {
   createIssue(issue: InsertIssue): Promise<Issue>;
   resolveIssue(id: number): Promise<Issue | undefined>;
   
+  // Project methods
+  getProjects(): Promise<Project[]>;
+  getProject(id: number): Promise<Project | undefined>;
+  createProject(project: InsertProject): Promise<Project>;
+  updateProjectStatus(id: number, status: string): Promise<Project | undefined>;
+  getTasksByProject(projectId: number): Promise<Task[]>;
+  
   // Dashboard metrics
   getDashboardMetrics(): Promise<{
     activeAgents: number;
@@ -70,12 +80,14 @@ export class MemStorage implements IStorage {
   private tasks: Map<number, Task>;
   private logs: Map<number, Log>;
   private issues: Map<number, Issue>;
+  private projects: Map<number, Project>;
   
   currentUserId: number;
   currentAgentId: number;
   currentTaskId: number;
   currentLogId: number;
   currentIssueId: number;
+  currentProjectId: number;
 
   constructor() {
     this.users = new Map();
@@ -83,13 +95,17 @@ export class MemStorage implements IStorage {
     this.tasks = new Map();
     this.logs = new Map();
     this.issues = new Map();
+    this.projects = new Map();
     
     this.currentUserId = 1;
     this.currentAgentId = 1;
     this.currentTaskId = 1;
     this.currentLogId = 1;
     this.currentIssueId = 1;
+    this.currentProjectId = 1;
     
+    // Initialize sample projects
+    this.initializeSampleProjects();
     // Initialize with default agents
     this.initializeDefaultAgents();
     // Initialize with sample tasks
@@ -98,6 +114,30 @@ export class MemStorage implements IStorage {
     this.initializeSampleLogs();
     // Initialize with sample issues
     this.initializeSampleIssues();
+  }
+  
+  private initializeSampleProjects() {
+    const sampleProjects = [
+      {
+        name: "E-commerce Platform",
+        description: "A complete e-commerce solution with product catalog, shopping cart, and checkout",
+        status: "in_progress"
+      },
+      {
+        name: "Task Management System",
+        description: "A project management tool with task tracking and team collaboration features",
+        status: "planning"
+      },
+      {
+        name: "Personal Finance App",
+        description: "Application for tracking expenses, budgeting, and financial goal planning",
+        status: "review"
+      }
+    ];
+    
+    sampleProjects.forEach(project => {
+      this.createProject(project);
+    });
   }
 
   private initializeDefaultAgents() {
@@ -269,7 +309,15 @@ export class MemStorage implements IStorage {
   async createAgent(insertAgent: InsertAgent): Promise<Agent> {
     const id = this.currentAgentId++;
     const createdAt = new Date();
-    const agent: Agent = { ...insertAgent, id, createdAt };
+    // Ensure required fields are set with defaults if not provided
+    const agent: Agent = { 
+      ...insertAgent, 
+      id, 
+      createdAt,
+      status: insertAgent.status || 'idle',
+      role: insertAgent.role || 'assistant',
+      description: insertAgent.description || null
+    };
     this.agents.set(id, agent);
     return agent;
   }
@@ -305,7 +353,19 @@ export class MemStorage implements IStorage {
     const createdAt = new Date();
     const updatedAt = new Date();
     const progress = 0;
-    const task: Task = { ...insertTask, id, progress, createdAt, updatedAt };
+    const task: Task = { 
+      ...insertTask, 
+      id, 
+      progress, 
+      createdAt, 
+      updatedAt,
+      projectId: insertTask.projectId || null,
+      status: insertTask.status || "queued",
+      priority: insertTask.priority || "medium",
+      description: insertTask.description || null,
+      assignedTo: insertTask.assignedTo || null,
+      estimatedTime: insertTask.estimatedTime || null
+    };
     this.tasks.set(id, task);
     return task;
   }
@@ -343,13 +403,25 @@ export class MemStorage implements IStorage {
   async getLogsByAgent(agentId: number): Promise<Log[]> {
     return Array.from(this.logs.values())
       .filter(log => log.agentId === agentId)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      .sort((a, b) => {
+        // Safely handle null timestamps by defaulting to current time
+        const timeA = a.timestamp ? a.timestamp.getTime() : Date.now();
+        const timeB = b.timestamp ? b.timestamp.getTime() : Date.now();
+        return timeB - timeA;
+      });
   }
 
   async createLog(insertLog: InsertLog): Promise<Log> {
     const id = this.currentLogId++;
-    const timestamp = insertLog.timestamp || new Date();
-    const log: Log = { ...insertLog, id, timestamp };
+    const timestamp = new Date();
+    const log: Log = { 
+      ...insertLog, 
+      id, 
+      timestamp,
+      type: insertLog.type || 'info',
+      agentId: insertLog.agentId || null,
+      details: insertLog.details || null
+    };
     this.logs.set(id, log);
     return log;
   }
@@ -370,8 +442,20 @@ export class MemStorage implements IStorage {
   async createIssue(insertIssue: InsertIssue): Promise<Issue> {
     const id = this.currentIssueId++;
     const createdAt = new Date();
-    const resolved = false;
-    const issue: Issue = { ...insertIssue, id, resolved, createdAt };
+    
+    // Explicitly create the issue with all required fields
+    const issue: Issue = { 
+      id, 
+      title: insertIssue.title,
+      description: insertIssue.description,
+      type: insertIssue.type || 'warning',
+      taskId: insertIssue.taskId || null,
+      code: insertIssue.code || null,
+      solution: insertIssue.solution || null,
+      resolved: false, 
+      createdAt
+    };
+    
     this.issues.set(id, issue);
     return issue;
   }
@@ -383,6 +467,66 @@ export class MemStorage implements IStorage {
     const updatedIssue = { ...issue, resolved: true };
     this.issues.set(id, updatedIssue);
     return updatedIssue;
+  }
+  
+  // Project methods
+  async getProjects(): Promise<Project[]> {
+    return Array.from(this.projects.values());
+  }
+  
+  async getProject(id: number): Promise<Project | undefined> {
+    return this.projects.get(id);
+  }
+  
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const id = this.currentProjectId++;
+    const createdAt = new Date();
+    const updatedAt = new Date();
+    
+    // Create project object explicitly listing all required fields
+    const project: Project = { 
+      id, 
+      name: insertProject.name,
+      status: insertProject.status || 'planning',
+      description: insertProject.description || null,
+      createdAt, 
+      updatedAt,
+      completedAt: null
+    };
+    
+    this.projects.set(id, project);
+    return project;
+  }
+  
+  async updateProjectStatus(id: number, status: string): Promise<Project | undefined> {
+    const project = this.projects.get(id);
+    if (!project) return undefined;
+    
+    const updatedAt = new Date();
+    let completedAt = project.completedAt;
+    
+    // If status changed to completed, set the completedAt timestamp
+    if (status === "completed" && project.status !== "completed") {
+      completedAt = new Date();
+    } 
+    // If status changed from completed to something else, clear the completedAt timestamp
+    else if (status !== "completed" && project.status === "completed") {
+      completedAt = null;
+    }
+    
+    const updatedProject = { 
+      ...project, 
+      status, 
+      updatedAt,
+      completedAt
+    };
+    this.projects.set(id, updatedProject);
+    return updatedProject;
+  }
+  
+  async getTasksByProject(projectId: number): Promise<Task[]> {
+    return Array.from(this.tasks.values())
+      .filter(task => task.projectId === projectId);
   }
 
   // Dashboard metrics
@@ -512,6 +656,7 @@ export class DatabaseStorage implements IStorage {
         priority: insertTask.priority || 'medium',
         assignedTo: insertTask.assignedTo || null,
         estimatedTime: insertTask.estimatedTime || null,
+        projectId: insertTask.projectId || null,
         progress: 0,
         createdAt: now,
         updatedAt: now
@@ -616,6 +761,62 @@ export class DatabaseStorage implements IStorage {
     return issue || undefined;
   }
   
+  // Project methods
+  async getProjects(): Promise<Project[]> {
+    return db.select().from(projects);
+  }
+  
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project || undefined;
+  }
+  
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const now = new Date();
+    const [project] = await db
+      .insert(projects)
+      .values({
+        name: insertProject.name,
+        description: insertProject.description || null,
+        status: insertProject.status || 'planning',
+        createdAt: now,
+        updatedAt: now,
+        completedAt: null
+      })
+      .returning();
+    return project;
+  }
+  
+  async updateProjectStatus(id: number, status: string): Promise<Project | undefined> {
+    const project = await this.getProject(id);
+    if (!project) return undefined;
+    
+    const updateData: any = { 
+      status,
+      updatedAt: new Date()
+    };
+    
+    // If status changed to completed, set the completedAt timestamp
+    if (status === "completed" && project.status !== "completed") {
+      updateData.completedAt = new Date();
+    } 
+    // If status changed from completed to something else, clear the completedAt timestamp
+    else if (status !== "completed" && project.status === "completed") {
+      updateData.completedAt = null;
+    }
+    
+    const [updatedProject] = await db
+      .update(projects)
+      .set(updateData)
+      .where(eq(projects.id, id))
+      .returning();
+    return updatedProject || undefined;
+  }
+  
+  async getTasksByProject(projectId: number): Promise<Task[]> {
+    return db.select().from(tasks).where(eq(tasks.projectId, projectId));
+  }
+  
   // Dashboard metrics
   async getDashboardMetrics(): Promise<{
     activeAgents: number;
@@ -680,6 +881,31 @@ export class DatabaseStorage implements IStorage {
         await this.createAgent(agent);
       }
       
+      // Initialize with sample projects
+      const sampleProjects = [
+        {
+          name: "E-commerce Platform",
+          description: "A complete e-commerce solution with product catalog, shopping cart, and checkout",
+          status: "in_progress"
+        },
+        {
+          name: "Task Management System",
+          description: "A project management tool with task tracking and team collaboration features",
+          status: "planning"
+        },
+        {
+          name: "Personal Finance App",
+          description: "Application for tracking expenses, budgeting, and financial goal planning",
+          status: "review"
+        }
+      ];
+      
+      const createdProjects = [];
+      for (const project of sampleProjects) {
+        const createdProject = await this.createProject(project);
+        createdProjects.push(createdProject);
+      }
+      
       // Initialize with sample tasks after agents are created
       const sampleTasks = [
         { 
@@ -688,7 +914,8 @@ export class DatabaseStorage implements IStorage {
           status: "in_progress", 
           priority: "high", 
           assignedTo: 2, // Builder 
-          estimatedTime: 30
+          estimatedTime: 30,
+          projectId: createdProjects[0].id // E-commerce Platform
         },
         { 
           title: "Fix API Integration Issues", 
@@ -696,7 +923,8 @@ export class DatabaseStorage implements IStorage {
           status: "debugging", 
           priority: "medium", 
           assignedTo: 3, // Debugger 
-          estimatedTime: 45
+          estimatedTime: 45,
+          projectId: createdProjects[0].id // E-commerce Platform
         },
         { 
           title: "Verify Form Validation Logic", 
@@ -704,7 +932,26 @@ export class DatabaseStorage implements IStorage {
           status: "queued", 
           priority: "low", 
           assignedTo: 4, // Verifier 
-          estimatedTime: 60
+          estimatedTime: 60,
+          projectId: createdProjects[0].id // E-commerce Platform
+        },
+        { 
+          title: "Design Task Creation Interface", 
+          description: "Create intuitive UI for creating and assigning tasks", 
+          status: "in_progress", 
+          priority: "medium", 
+          assignedTo: 2, // Builder 
+          estimatedTime: 20,
+          projectId: createdProjects[1].id // Task Management System
+        },
+        { 
+          title: "Setup Real-time Collaboration", 
+          description: "Implement WebSocket for real-time task updates", 
+          status: "queued", 
+          priority: "high", 
+          assignedTo: 2, // Builder 
+          estimatedTime: 40,
+          projectId: createdProjects[1].id // Task Management System
         }
       ];
       

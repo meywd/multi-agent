@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { Agent, Task, Log, Issue, DashboardMetrics, AgentContextType, WebSocketMessage } from "@/lib/types";
+import { Agent, Task, Log, Issue, Project, DashboardMetrics, AgentContextType, WebSocketMessage } from "@/lib/types";
 import { createWebSocketConnection, sendWebSocketMessage } from "@/lib/websocket";
-import { getLogsByAgent, getIssuesByTask, getDashboardMetrics } from "@/lib/agentService";
+import { getLogsByAgent, getIssuesByTask, getDashboardMetrics, getTasksByProject } from "@/lib/agentService";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 
@@ -23,8 +23,10 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [logs, setLogs] = useState<Record<number, Log[]>>({});
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics>(initialMetrics);
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null);
+  const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,6 +49,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       case 'initial_data':
         setAgents(data.data.agents);
         setTasks(data.data.tasks);
+        setProjects(data.data.projects);
         setMetrics(data.data.metrics);
         setIsLoading(false);
         break;
@@ -86,6 +89,16 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         setIssues(prevIssues => 
           prevIssues.map(issue => 
             issue.id === data.issue.id ? data.issue : issue
+          )
+        );
+        break;
+      case 'project_created':
+        setProjects(prevProjects => [...prevProjects, data.project]);
+        break;
+      case 'project_updated':
+        setProjects(prevProjects => 
+          prevProjects.map(project => 
+            project.id === data.project.id ? data.project : project
           )
         );
         break;
@@ -134,6 +147,15 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const getTasksForProject = useCallback(async (projectId: number) => {
+    try {
+      const projectTasks = await getTasksByProject(projectId);
+      setTasks(projectTasks);
+    } catch (error) {
+      console.error(`Error fetching tasks for project ${projectId}:`, error);
+    }
+  }, []);
+
   useEffect(() => {
     // Clean up WebSocket connection on unmount
     return () => {
@@ -147,20 +169,31 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       getAgentLogs(selectedAgent);
     }
   }, [selectedAgent, getAgentLogs]);
+  
+  // Fetch tasks for selected project when it changes
+  useEffect(() => {
+    if (selectedProject) {
+      getTasksForProject(selectedProject);
+    }
+  }, [selectedProject, getTasksForProject]);
 
   const value: AgentContextType = {
     agents,
     tasks,
     logs,
     issues,
+    projects,
     metrics,
     selectedAgent,
+    selectedProject,
     isLoading,
     connectWebSocket,
     disconnectWebSocket,
     setSelectedAgent,
+    setSelectedProject,
     getAgentLogs,
-    getIssuesForTask
+    getIssuesForTask,
+    getTasksForProject
   };
 
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;

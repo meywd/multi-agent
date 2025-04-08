@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertAgentSchema, insertTaskSchema, insertLogSchema, insertIssueSchema } from "@shared/schema";
+import { insertAgentSchema, insertTaskSchema, insertLogSchema, insertIssueSchema, insertProjectSchema } from "@shared/schema";
 import { getAgentResponse, analyzeCode, generateCode, verifyImplementation } from "./openai";
 
 interface WebSocketClient extends WebSocket {
@@ -78,15 +78,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function sendInitialData(ws: WebSocketClient) {
     if (ws.readyState === WebSocket.OPEN) {
       try {
-        const [agents, tasks, metrics] = await Promise.all([
+        const [agents, tasks, projects, metrics] = await Promise.all([
           storage.getAgents(),
           storage.getTasks(),
+          storage.getProjects(),
           storage.getDashboardMetrics()
         ]);
         
         ws.send(JSON.stringify({ 
           type: 'initial_data',
-          data: { agents, tasks, metrics }
+          data: { agents, tasks, projects, metrics }
         }));
       } catch (err) {
         console.error('Error sending initial data:', err);
@@ -502,6 +503,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error('Error verifying implementation:', err);
       res.status(500).json({ message: 'Error verifying implementation' });
+    }
+  });
+
+  // Project routes
+  app.get('/api/projects', async (req, res) => {
+    try {
+      const projects = await storage.getProjects();
+      res.json(projects);
+    } catch (err) {
+      res.status(500).json({ message: 'Error fetching projects' });
+    }
+  });
+  
+  app.get('/api/projects/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const project = await storage.getProject(id);
+      
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      res.json(project);
+    } catch (err) {
+      res.status(500).json({ message: 'Error fetching project' });
+    }
+  });
+  
+  app.post('/api/projects', async (req, res) => {
+    try {
+      const parsedBody = insertProjectSchema.safeParse(req.body);
+      
+      if (!parsedBody.success) {
+        return res.status(400).json({ message: 'Invalid project data', errors: parsedBody.error });
+      }
+      
+      const project = await storage.createProject(parsedBody.data);
+      res.status(201).json(project);
+      
+      // Broadcast new project to all clients
+      broadcastMessage(wss, { type: 'project_created', project });
+    } catch (err) {
+      res.status(500).json({ message: 'Error creating project' });
+    }
+  });
+  
+  app.patch('/api/projects/:id/status', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      
+      if (!status) {
+        return res.status(400).json({ message: 'Status is required' });
+      }
+      
+      const project = await storage.updateProjectStatus(id, status);
+      
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      res.json(project);
+      
+      // Broadcast project update to all clients
+      broadcastMessage(wss, { type: 'project_updated', project });
+    } catch (err) {
+      res.status(500).json({ message: 'Error updating project status' });
+    }
+  });
+  
+  app.get('/api/projects/:id/tasks', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tasks = await storage.getTasksByProject(id);
+      res.json(tasks);
+    } catch (err) {
+      res.status(500).json({ message: 'Error fetching project tasks' });
     }
   });
 
