@@ -18,8 +18,8 @@ import {
   issues,
   projects
 } from "@shared/schema";
+import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // User methods (kept from original)
@@ -746,32 +746,21 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getConversationLogs(projectId?: number): Promise<Log[]> {
-    // Use a simple conditional without chaining syntax
     if (projectId !== undefined) {
       // If projectId is provided, filter by both type and projectId
-      const result = await db.select()
+      return db.select()
         .from(logs)
-        .where(eq(logs.type, 'conversation'))
-        .where(eq(logs.projectId, projectId));
-      
-      // Sort the results manually
-      return result.sort((a, b) => {
-        const timeA = a.timestamp ? a.timestamp.getTime() : Date.now();
-        const timeB = b.timestamp ? b.timestamp.getTime() : Date.now();
-        return timeB - timeA;
-      });
+        .where(and(
+          eq(logs.type, 'conversation'),
+          eq(logs.projectId, projectId)
+        ))
+        .orderBy(desc(logs.timestamp));
     } else {
       // Otherwise just filter by type
-      const result = await db.select()
+      return db.select()
         .from(logs)
-        .where(eq(logs.type, 'conversation'));
-      
-      // Sort the results manually
-      return result.sort((a, b) => {
-        const timeA = a.timestamp ? a.timestamp.getTime() : Date.now();
-        const timeB = b.timestamp ? b.timestamp.getTime() : Date.now();
-        return timeB - timeA;
-      });
+        .where(eq(logs.type, 'conversation'))
+        .orderBy(desc(logs.timestamp));
     }
   }
 
