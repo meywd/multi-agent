@@ -35,19 +35,33 @@ export default function ProjectsPage() {
     },
   });
 
-  const { data: projects = [], isLoading } = useQuery<Project[]>({
+  const { 
+    data: projects = [], 
+    isLoading,
+    refetch
+  } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
+    staleTime: 0, // Always refetch when queryKey is invalidated
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
   });
 
   const handleSubmit = async (values: z.infer<typeof projectSchema>) => {
     try {
-      await apiRequest({
+      console.log("Creating project with values:", values);
+      const response = await apiRequest({
         method: "POST",
         url: "/api/projects",
         body: values,
       });
+      
+      console.log("Project created response:", response);
 
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      // Immediate query invalidation
+      await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      
+      // Manually trigger a refetch
+      await refetch();
+      
       toast({
         title: "Project created",
         description: "Your new project has been created successfully",
@@ -55,6 +69,7 @@ export default function ProjectsPage() {
       setIsDialogOpen(false);
       form.reset();
     } catch (error) {
+      console.error("Error creating project:", error);
       toast({
         title: "Error",
         description: "Failed to create project. Please try again.",

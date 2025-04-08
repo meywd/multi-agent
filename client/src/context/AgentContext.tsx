@@ -45,8 +45,21 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   }, [dashboardMetrics]);
 
   const handleWebSocketMessage = useCallback((data: WebSocketMessage) => {
+    console.log("WebSocket message received:", data);
+    
+    // TypeScript type narrowing
+    if (!data || typeof data !== 'object' || !('type' in data)) {
+      console.error("Invalid WebSocket message format:", data);
+      return;
+    }
+    
     switch (data.type) {
       case 'initial_data':
+        console.log("Setting initial data from WebSocket:", {
+          agents: data.data.agents.length,
+          tasks: data.data.tasks.length,
+          projects: data.data.projects.length
+        });
         setAgents(data.data.agents);
         setTasks(data.data.tasks);
         setProjects(data.data.projects);
@@ -54,9 +67,11 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
         break;
       case 'agent_created':
+        console.log("Agent created:", data.agent);
         setAgents(prevAgents => [...prevAgents, data.agent]);
         break;
       case 'agent_updated':
+        console.log("Agent updated:", data.agent);
         setAgents(prevAgents => 
           prevAgents.map(agent => 
             agent.id === data.agent.id ? data.agent : agent
@@ -64,9 +79,11 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         );
         break;
       case 'task_created':
+        console.log("Task created:", data.task);
         setTasks(prevTasks => [...prevTasks, data.task]);
         break;
       case 'task_updated':
+        console.log("Task updated:", data.task);
         setTasks(prevTasks => 
           prevTasks.map(task => 
             task.id === data.task.id ? data.task : task
@@ -74,6 +91,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         );
         break;
       case 'log_created':
+        console.log("Log created:", data.log);
         setLogs(prevLogs => {
           const agentLogs = prevLogs[data.log.agentId] || [];
           return {
@@ -83,9 +101,11 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         });
         break;
       case 'issue_created':
+        console.log("Issue created:", data.issue);
         setIssues(prevIssues => [...prevIssues, data.issue]);
         break;
       case 'issue_updated':
+        console.log("Issue updated:", data.issue);
         setIssues(prevIssues => 
           prevIssues.map(issue => 
             issue.id === data.issue.id ? data.issue : issue
@@ -93,15 +113,28 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         );
         break;
       case 'project_created':
-        setProjects(prevProjects => [...prevProjects, data.project]);
+        console.log("Project created via WebSocket:", data.project);
+        setProjects(prevProjects => {
+          console.log("Updating projects state with new project. Current count:", prevProjects.length);
+          const newProjects = [...prevProjects, data.project];
+          console.log("New projects count:", newProjects.length);
+          return newProjects;
+        });
+        // Also invalidate projects queries specifically
+        queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
         break;
       case 'project_updated':
+        console.log("Project updated:", data.project);
         setProjects(prevProjects => 
           prevProjects.map(project => 
             project.id === data.project.id ? data.project : project
           )
         );
+        queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/projects', data.project.id] });
         break;
+      default:
+        console.warn("Unknown WebSocket message type:", data.type);
     }
     
     // Invalidate relevant queries to ensure data consistency
@@ -156,12 +189,17 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Connect to WebSocket when the component mounts
   useEffect(() => {
+    console.log("Connecting to WebSocket...");
+    connectWebSocket();
+    
     // Clean up WebSocket connection on unmount
     return () => {
+      console.log("Disconnecting from WebSocket...");
       disconnectWebSocket();
     };
-  }, [disconnectWebSocket]);
+  }, [connectWebSocket, disconnectWebSocket]);
 
   // Fetch logs for selected agent when it changes
   useEffect(() => {
