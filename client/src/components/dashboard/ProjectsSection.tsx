@@ -90,12 +90,13 @@ export default function ProjectsSection() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-neutral-800">Projects</h2>
+        <h2 className="text-lg sm:text-xl font-semibold text-neutral-800">Projects</h2>
         <Button 
           onClick={() => setShowNewProjectForm(!showNewProjectForm)}
           size="sm"
+          className="text-xs sm:text-sm"
         >
           {showNewProjectForm ? "Cancel" : "New Project"}
         </Button>
@@ -104,53 +105,55 @@ export default function ProjectsSection() {
       {/* New Project Form */}
       {showNewProjectForm && (
         <Card className="border border-blue-200 bg-blue-50">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 p-3 sm:p-4">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Create New Project</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Create New Project</CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0" 
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0" 
                 onClick={() => setShowNewProjectForm(false)}
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateProject} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+          <CardContent className="p-3 sm:p-4">
+            <form onSubmit={handleCreateProject} className="space-y-3 sm:space-y-4">
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="name" className="text-xs sm:text-sm">Name</Label>
                 <Input 
                   id="name" 
                   value={newProject.name}
                   onChange={(e) => setNewProject({...newProject, name: e.target.value})}
                   placeholder="Project name"
                   required
+                  className="text-xs sm:text-sm"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
                 <Textarea 
                   id="description" 
                   value={newProject.description}
                   onChange={(e) => setNewProject({...newProject, description: e.target.value})}
                   placeholder="Project description"
                   rows={3}
+                  className="text-xs sm:text-sm"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="status" className="text-xs sm:text-sm">Status</Label>
                 <Select 
                   value={newProject.status}
                   onValueChange={(value) => setNewProject({...newProject, status: value})}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="text-xs sm:text-sm">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="text-xs sm:text-sm">
                     <SelectItem value="planning">Planning</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="review">Review</SelectItem>
@@ -161,8 +164,9 @@ export default function ProjectsSection() {
               
               <Button 
                 type="submit" 
-                className="w-full mt-2"
+                className="w-full mt-2 text-xs sm:text-sm"
                 disabled={createProjectMutation.isPending}
+                size="sm"
               >
                 {createProjectMutation.isPending ? "Creating..." : "Create Project"}
               </Button>
@@ -173,23 +177,25 @@ export default function ProjectsSection() {
 
       {/* Projects List */}
       {isLoading ? (
-        <div className="text-center py-8">Loading projects...</div>
+        <div className="text-center py-6 sm:py-8 text-xs sm:text-sm">Loading projects...</div>
       ) : projects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {projects.map((project: Project) => (
             <Card key={project.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">{project.name}</CardTitle>
-                <Badge className={`font-normal ${getStatusColor(project.status)}`}>
-                  {project.status.replace("_", " ")}
-                </Badge>
+              <CardHeader className="pb-2 p-3 sm:p-4">
+                <div className="flex justify-between items-start flex-wrap gap-2">
+                  <CardTitle className="text-base sm:text-lg">{project.name}</CardTitle>
+                  <Badge className={`text-xs font-normal ${getStatusColor(project.status)}`}>
+                    {project.status.replace("_", " ")}
+                  </Badge>
+                </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-neutral-600 text-sm line-clamp-3">
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <p className="text-neutral-600 text-xs sm:text-sm line-clamp-3">
                   {project.description || "No description provided."}
                 </p>
               </CardContent>
-              <CardFooter className="pt-0 flex flex-col items-start gap-2">
+              <CardFooter className="p-3 sm:p-4 pt-0 flex flex-col items-start gap-1 sm:gap-2">
                 <div className="text-xs text-neutral-500">
                   Created: {new Date(project.createdAt).toLocaleDateString()}
                 </div>
@@ -198,7 +204,7 @@ export default function ProjectsSection() {
                     Completed: {new Date(project.completedAt).toLocaleDateString()}
                   </div>
                 )}
-                <Button variant="outline" size="sm" className="mt-2">
+                <Button variant="outline" size="sm" className="mt-2 text-xs sm:text-sm">
                   View Details
                 </Button>
               </CardFooter>
@@ -206,7 +212,7 @@ export default function ProjectsSection() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-8 text-neutral-600">
+        <div className="text-center py-6 sm:py-8 text-neutral-600 text-xs sm:text-sm">
           No projects found. Create your first project!
         </div>
       )}

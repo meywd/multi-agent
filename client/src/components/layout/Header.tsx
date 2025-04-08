@@ -1,55 +1,38 @@
-import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { Menu } from "lucide-react";
 
-export function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const isMobile = useIsMobile();
+interface HeaderProps {
+  onMenuClick: () => void;
+}
 
-  const toggleMenu = () => {
-    setIsMenuOpen(prev => !prev);
-  };
-
+export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="border-b border-neutral-200 bg-white shadow-sm">
-      <div className="flex h-16 items-center justify-between px-6">
+      <div className="flex h-16 items-center justify-between px-3 md:px-6">
         <div className="flex items-center gap-4">
-          {isMobile && (
-            <button 
-              className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100"
-              onClick={toggleMenu}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-6 w-6"
-              >
-                <line x1="4" x2="20" y1="12" y2="12" />
-                <line x1="4" x2="20" y1="6" y2="6" />
-                <line x1="4" x2="20" y1="18" y2="18" />
-              </svg>
-              <span className="sr-only">Toggle menu</span>
-            </button>
-          )}
+          <Button 
+            variant="ghost"
+            size="icon"
+            className="md:hidden" 
+            onClick={onMenuClick}
+          >
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">Open menu</span>
+          </Button>
           
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-white font-medium">
+            <span className="hidden sm:flex h-9 w-9 items-center justify-center rounded-md bg-primary text-white font-medium">
               AI
             </span>
             
-            <span className="text-lg font-semibold text-neutral-800">Multi-Agent Platform</span>
+            <span className="text-sm sm:text-base md:text-lg font-semibold text-neutral-800 truncate">Multi-Agent Platform</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
           <Link href="https://github.com/yourusername/multi-agent-platform" target="_blank">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="hidden md:flex">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -67,8 +50,8 @@ export function Header() {
             </Button>
           </Link>
           
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button variant="outline" size="icon" className="hidden sm:flex">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -104,7 +87,7 @@ export function Header() {
           
           <div className="relative">
             <button className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 text-neutral-800 hover:bg-neutral-300">
-              <span className="font-medium">AJ</span>
+              <span className="text-xs sm:text-sm font-medium">AJ</span>
             </button>
           </div>
         </div>

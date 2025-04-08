@@ -1,19 +1,14 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { X } from "lucide-react";
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [location] = useLocation();
-  const isMobile = useIsMobile();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  const toggleCollapse = () => {
-    setIsCollapsed(prev => !prev);
-  };
-
-  // Only show on larger screens if not collapsed
-  const isVisible = !isMobile && !isCollapsed;
 
   const navItems = [
     {
@@ -144,10 +139,12 @@ export function Sidebar() {
     }
   ];
 
-  if (!isVisible) return null;
-
   return (
-    <div className="border-r border-neutral-200 bg-white w-64 h-screen flex flex-col">
+    <div 
+      className={`fixed inset-y-0 left-0 z-50 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
+                 md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
+                 border-r border-neutral-200 bg-white w-64 h-screen flex flex-col`}
+    >
       <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-white font-medium">
@@ -158,28 +155,18 @@ export function Sidebar() {
         <Button 
           variant="ghost" 
           size="icon"
-          onClick={toggleCollapse}
+          onClick={onToggle}
+          className="md:hidden"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          <span className="sr-only">Collapse sidebar</span>
+          <X className="h-5 w-5" />
+          <span className="sr-only">Close sidebar</span>
         </Button>
       </div>
 
       <nav className="flex-1 px-2 py-4">
         <div className="space-y-1">
           {navItems.map(item => (
-            <Link key={item.name} href={item.href}>
+            <Link key={item.name} href={item.href} onClick={() => onToggle()}>
               <Button
                 variant={item.isActive ? "secondary" : "ghost"}
                 className={`w-full justify-start ${item.isActive ? 'font-medium' : ''}`}

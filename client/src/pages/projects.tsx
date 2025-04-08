@@ -78,34 +78,34 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Projects</h1>
+    <div className="w-full px-2 sm:px-4 md:px-6 py-4 sm:py-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Projects</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
               Create Project
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm">
                 Add a new project for your agents to work on. This will create a new project and allow you to assign tasks to it.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3 sm:space-y-4">
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Project Name</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Project Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="E.g., E-commerce Website" {...field} />
+                        <Input placeholder="E.g., E-commerce Website" {...field} className="text-xs sm:text-sm" />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
@@ -114,15 +114,15 @@ export default function ProjectsPage() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Description</FormLabel>
                       <FormControl>
                         <Textarea 
                           placeholder="Describe the project objectives and scope..." 
                           {...field} 
-                          className="h-24"
+                          className="h-24 text-xs sm:text-sm"
                         />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
@@ -131,10 +131,10 @@ export default function ProjectsPage() {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Status</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Status</FormLabel>
                       <FormControl>
                         <select 
-                          className="w-full p-2 border rounded-md" 
+                          className="w-full p-2 border rounded-md text-xs sm:text-sm" 
                           {...field}
                         >
                           <option value="planning">Planning</option>
@@ -143,12 +143,12 @@ export default function ProjectsPage() {
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
                 <DialogFooter>
-                  <Button type="submit">Create Project</Button>
+                  <Button type="submit" size="sm" className="text-xs sm:text-sm">Create Project</Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -157,52 +157,52 @@ export default function ProjectsPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse">
-              <CardHeader className="pb-2">
-                <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+              <CardHeader className="pb-2 p-3 sm:p-4">
+                <div className="h-5 sm:h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-1/4"></div>
               </CardHeader>
-              <CardContent>
-                <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+              <CardContent className="p-3 sm:p-4">
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-full mb-2"></div>
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-5/6"></div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : projects.length === 0 ? (
-        <Card className="w-full text-center py-12">
+        <Card className="w-full text-center py-8 sm:py-12">
           <CardContent>
-            <p className="text-muted-foreground mb-4">No projects found. Create your first project to get started.</p>
+            <p className="text-muted-foreground text-xs sm:text-sm mb-4">No projects found. Create your first project to get started.</p>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button>Create Your First Project</Button>
+                <Button size="sm" className="text-xs sm:text-sm">Create Your First Project</Button>
               </DialogTrigger>
             </Dialog>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
           {projects.map((project) => (
             <Card key={project.id} className="overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl">{project.name}</CardTitle>
-                  <Badge className={getStatusColor(project.status)}>
+              <CardHeader className="pb-2 p-3 sm:p-4">
+                <div className="flex flex-wrap justify-between items-start gap-2">
+                  <CardTitle className="text-base sm:text-lg md:text-xl">{project.name}</CardTitle>
+                  <Badge className={`text-xs ${getStatusColor(project.status)}`}>
                     {project.status === "in_progress" ? "In Progress" : 
                      project.status.charAt(0).toUpperCase() + project.status.slice(1)}
                   </Badge>
                 </div>
-                <CardDescription className="text-sm text-gray-500">
+                <CardDescription className="text-xs sm:text-sm text-gray-500">
                   Created: {new Date(project.createdAt).toLocaleDateString()}
                 </CardDescription>
               </CardHeader>
               <Separator />
-              <CardContent className="pt-4">
-                <p className="text-sm text-gray-700 line-clamp-3">{project.description}</p>
-                <div className="mt-4 flex justify-end">
-                  <Button variant="outline" size="sm">
+              <CardContent className="pt-3 sm:pt-4 p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-gray-700 line-clamp-3">{project.description}</p>
+                <div className="mt-3 sm:mt-4 flex justify-end">
+                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
                     View Details
                   </Button>
                 </div>
