@@ -91,8 +91,8 @@ export default function TaskDetailPage() {
         </Link>
         
         <h1 className="text-2xl font-bold">
-          {task.isFeature === true ? "Feature: " : "Task: "}
-          {task.title}
+          {task.isFeature ? "Feature: " : "Task: "}
+          {task.title || "Untitled"}
         </h1>
       </div>
 
@@ -103,10 +103,12 @@ export default function TaskDetailPage() {
         </CardHeader>
         <CardContent>
           <p>ID: {task.id}</p>
-          <p>Status: {task.status}</p>
-          <p>Priority: {task.priority}</p>
-          <p>Progress: {task.progress}%</p>
-          <p>Assigned To: {task.assignedTo || "Unassigned"}</p>
+          <p>Status: {task.status || "Unknown"}</p>
+          <p>Priority: {task.priority || "Medium"}</p>
+          <p>Progress: {task.progress || 0}%</p>
+          <p>Assigned To: {task.assignedTo ? `Agent #${task.assignedTo}` : "Unassigned"}</p>
+          {task.projectId && <p>Project ID: {task.projectId}</p>}
+          {task.parentId && <p>Parent Feature ID: {task.parentId}</p>}
           {task.estimatedTime && <p>Estimated Time: {task.estimatedTime} hours</p>}
           {task.description && (
             <>

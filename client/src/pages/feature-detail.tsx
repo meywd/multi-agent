@@ -69,16 +69,14 @@ export default function FeatureDetailPage() {
   return (
     <div className="w-full px-4 py-6">
       <div className="mb-6">
-        {feature.projectId && (
-          <Link href={`/projects/${feature.projectId}`}>
-            <Button variant="ghost" size="sm" className="mb-2">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Project
-            </Button>
-          </Link>
-        )}
+        <Link href={feature.projectId ? `/projects/${feature.projectId}` : "/projects"}>
+          <Button variant="ghost" size="sm" className="mb-2">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {feature.projectId ? "Back to Project" : "Back to Projects"}
+          </Button>
+        </Link>
         
-        <h1 className="text-2xl font-bold">Feature: {feature.title}</h1>
+        <h1 className="text-2xl font-bold">Feature: {feature.title || "Untitled"}</h1>
       </div>
 
       {/* Feature details will be displayed here */}
@@ -88,9 +86,10 @@ export default function FeatureDetailPage() {
         </CardHeader>
         <CardContent>
           <p>ID: {feature.id}</p>
-          <p>Status: {feature.status}</p>
-          <p>Priority: {feature.priority}</p>
-          <p>Progress: {feature.progress}%</p>
+          <p>Status: {feature.status || "Unknown"}</p>
+          <p>Priority: {feature.priority || "Medium"}</p>
+          <p>Progress: {feature.progress || 0}%</p>
+          <p>Project ID: {feature.projectId || "None"}</p>
           {feature.description && (
             <>
               <Separator className="my-4" />
@@ -122,16 +121,23 @@ export default function FeatureDetailPage() {
             <Card key={subtask.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <CardTitle>{subtask.title}</CardTitle>
-                  <Badge>{subtask.status}</Badge>
+                  <CardTitle>{subtask.title || "Untitled"}</CardTitle>
+                  <Badge>{subtask.status || "Unknown"}</Badge>
                 </div>
-                <CardDescription>Priority: {subtask.priority} • Progress: {subtask.progress}%</CardDescription>
+                <CardDescription>
+                  Priority: {subtask.priority || "Medium"} • Progress: {subtask.progress || 0}%
+                </CardDescription>
               </CardHeader>
               {subtask.description && (
                 <CardContent>
                   <p>{subtask.description}</p>
                 </CardContent>
               )}
+              <CardFooter>
+                <Link href={`/tasks/${subtask.id}`}>
+                  <Button variant="outline" size="sm">View Details</Button>
+                </Link>
+              </CardFooter>
             </Card>
           ))}
         </div>
