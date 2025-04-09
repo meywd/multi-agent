@@ -204,3 +204,18 @@ export async function getProjectConversations(projectId: number): Promise<Log[]>
     url: `/api/projects/${projectId}/conversations`
   });
 }
+
+export async function respondToConversation(
+  projectId: number, 
+  message: string, 
+  targetAgentId?: number
+): Promise<Log> {
+  return await apiRequest({
+    method: "POST",
+    url: `/api/projects/${projectId}/respond`,
+    body: { 
+      message,
+      agentId: targetAgentId 
+    }
+  });
+}

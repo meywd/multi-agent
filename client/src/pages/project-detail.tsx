@@ -1,26 +1,45 @@
 import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { getProject, getTasksByProject, getProjectConversations } from "@/lib/agentService";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { 
+  getProject, 
+  getTasksByProject, 
+  getProjectConversations, 
+  respondToConversation 
+} from "@/lib/agentService";
 import { 
   Card, 
   CardContent, 
   CardDescription, 
   CardHeader, 
-  CardTitle 
+  CardTitle, 
+  CardFooter 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Project, Task, Log } from "@/lib/types";
 import { Link } from "wouter";
-import { ArrowLeft, Clock, Calendar, MessageSquare, User } from "lucide-react";
+import { 
+  ArrowLeft, 
+  Clock, 
+  Calendar, 
+  MessageSquare, 
+  User, 
+  Send, 
+  Reply 
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const projectId = parseInt(id as string);
+  const [message, setMessage] = useState("");
+  const [replyingTo, setReplyingTo] = useState<{agentId: number, name: string} | null>(null);
 
   const { 
     data: project, 
@@ -87,6 +106,48 @@ export default function ProjectDetailPage() {
     return status === "in_progress" 
       ? "In Progress" 
       : status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  // Add mutation for replying to agent conversation
+  const replyMutation = useMutation({
+    mutationFn: ({ message, targetAgentId }: { message: string, targetAgentId?: number }) => 
+      respondToConversation(projectId, message, targetAgentId),
+    onSuccess: () => {
+      // Clear the form and reset replyingTo state
+      setMessage("");
+      setReplyingTo(null);
+      
+      // Invalidate and refetch conversations query to show the new message
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "conversations"] });
+      
+      toast({
+        title: "Response sent",
+        description: "Your message has been sent to the agent.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error sending response",
+        description: "There was a problem sending your message. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Failed to send response:", error);
+    }
+  });
+
+  const handleReply = (agentId: number, agentName: string) => {
+    setReplyingTo({ agentId, name: agentName });
+  };
+
+  const handleSendMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    if (!message.trim()) return;
+    
+    replyMutation.mutate({
+      message,
+      targetAgentId: replyingTo?.agentId
+    });
   };
 
   if (isLoadingProject) {
@@ -284,11 +345,76 @@ export default function ProjectDetailPage() {
                         {log.details}
                       </div>
                     )}
+                    
+                    {/* Add reply button if the message is from an agent */}
+                    {log.agentId && (
+                      <div className="mt-3 flex justify-end">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-xs flex items-center gap-1 text-primary"
+                          onClick={() => handleReply(log.agentId!, `Agent #${log.agentId}`)}
+                        >
+                          <Reply className="h-3 w-3" />
+                          Reply
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+          
+          {/* Reply form */}
+          <Card className="overflow-hidden mt-6">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">
+                {replyingTo ? `Reply to ${replyingTo.name}` : "Send a message"}
+              </CardTitle>
+              {replyingTo && (
+                <CardDescription className="text-xs">
+                  Your response will be sent directly to this agent.
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent className="p-4 pt-2">
+              <form onSubmit={handleSendMessage} className="space-y-3">
+                <div className="flex flex-col space-y-2">
+                  <Input
+                    placeholder="Type your message here..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    className="w-full"
+                  />
+                  {replyingTo && (
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="h-auto p-0 text-xs"
+                        onClick={() => setReplyingTo(null)}
+                        type="button"
+                      >
+                        Clear recipient
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  <Button 
+                    type="submit" 
+                    size="sm"
+                    disabled={!message.trim() || replyMutation.isPending}
+                    className="gap-1"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {replyMutation.isPending ? "Sending..." : "Send Message"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
