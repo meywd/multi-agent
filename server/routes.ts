@@ -5,6 +5,84 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { insertAgentSchema, insertTaskSchema, insertLogSchema, insertIssueSchema, insertProjectSchema } from "@shared/schema";
 import { getAgentResponse, analyzeCode, generateCode, verifyImplementation } from "./openai";
+import OpenAI from "openai";
+
+// Initialize OpenAI client
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Helper function to extract task information from agent responses
+async function extractTasksFromResponse(response: string, projectId: number): Promise<Array<{
+  title: string;
+  description?: string;
+  priority?: string;
+  status?: string;
+  estimatedTime?: number;
+  assignedTo?: number;
+}>> {
+  try {
+    // Use OpenAI client to parse the text into structured tasks
+    const parsedResponse = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model
+      messages: [
+        {
+          role: "system",
+          content: `You are a task extraction assistant. Extract tasks from the following text in a structured format.
+          For each task, identify the following (if present):
+          - title (required)
+          - description (optional)
+          - priority (optional, one of: "low", "medium", "high")
+          - status (optional, default to "queued")
+          - estimatedTime (optional, in hours, numeric)
+          - assignedTo (optional, agent ID number)
+          
+          Respond with a JSON array of task objects only. Do not include any explanations or commentary.`
+        },
+        {
+          role: "user",
+          content: response
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1
+    });
+    
+    if (!parsedResponse.choices[0].message.content) {
+      return [];
+    }
+    
+    try {
+      const parsedContent = JSON.parse(parsedResponse.choices[0].message.content);
+      
+      if (Array.isArray(parsedContent.tasks)) {
+        return parsedContent.tasks.map((task: { 
+          title: string, 
+          description?: string, 
+          priority?: string, 
+          status?: string, 
+          estimatedTime?: number, 
+          assignedTo?: number 
+        }) => ({
+          title: task.title,
+          description: task.description || null,
+          priority: task.priority || "medium",
+          status: task.status || "queued",
+          estimatedTime: task.estimatedTime || null,
+          assignedTo: task.assignedTo || null,
+          projectId
+        }));
+      } else {
+        // Handle case where the response has tasks directly at the root
+        return Array.isArray(parsedContent) ? parsedContent : [];
+      }
+    } catch (error) {
+      console.error("Error parsing task JSON:", error);
+      return [];
+    }
+  } catch (error) {
+    console.error("Error extracting tasks:", error);
+    return [];
+  }
+}
 
 interface WebSocketClient extends WebSocket {
   isAlive: boolean;
@@ -661,11 +739,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const agent = await storage.getAgent(agentId);
           
           if (agent) {
+            // Get project tasks for context
+            const projectTasks = await storage.getTasksByProject(projectId);
+            
+            // Check if the message is asking to create tasks
+            const createTasksRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?/i;
+            const isCreatingTasks = createTasksRegex.test(message.toLowerCase());
+            
             // Generate an agent response based on the message
             const response = await getAgentResponse(agent, message, {
               project,
               allProjects: await storage.getProjects(),
-              recentLogs: await storage.getLogsByProject(projectId)
+              recentLogs: await storage.getLogsByProject(projectId),
+              relatedTasks: projectTasks
             });
             
             // Create a conversation log from the agent
@@ -679,6 +765,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Broadcast the new log
             broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
+            
+            // If user is asking to create tasks and agent is Orchestrator, try to extract tasks
+            if (isCreatingTasks && agent.role === 'coordinator') {
+              try {
+                // Extract task information from the agent's response
+                const taskExtraction = await extractTasksFromResponse(response, projectId);
+                
+                // Create the tasks
+                for (const taskInfo of taskExtraction) {
+                  const task = await storage.createTask({
+                    ...taskInfo,
+                    projectId
+                  });
+                  
+                  // Create a log about task creation
+                  await storage.createLog({
+                    agentId: agent.id,
+                    projectId,
+                    type: 'info',
+                    message: `Created task: ${task.title}`,
+                    details: task.description
+                  });
+                  
+                  // Broadcast task creation
+                  broadcastMessage(wss, { type: 'task_created', task });
+                }
+                
+                console.log(`Created ${taskExtraction.length} tasks for project ${projectId}`);
+              } catch (error) {
+                console.error('Error extracting tasks from response:', error);
+              }
+            }
           }
         } catch (error) {
           console.error('Error creating agent response:', error);
