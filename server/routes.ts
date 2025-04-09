@@ -1024,29 +1024,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check which phase of development the message seems to be about
         if (messageLC.includes('bug') || messageLC.includes('error') || messageLC.includes('fix') || 
             messageLC.includes('issue') || messageLC.includes('debug')) {
-          // Debugging related - assign to debugger
-          const debuggerAgent = agents.find(a => a.role === 'debugger');
+          // Debugging related - assign to debugger (qa role)
+          const debuggerAgent = agents.find(a => a.role === 'qa');
           if (debuggerAgent) respondingAgentId = debuggerAgent.id;
         } else if (messageLC.includes('test') || messageLC.includes('verify') || 
                    messageLC.includes('validation') || messageLC.includes('check if')) {
-          // Testing/verification related - assign to verifier
-          const verifier = agents.find(a => a.role === 'verifier');
+          // Testing/verification related - assign to verifier (tester role)
+          const verifier = agents.find(a => a.role === 'tester');
           if (verifier) respondingAgentId = verifier.id;
         } else if (messageLC.includes('design') || messageLC.includes('ui') || 
                    messageLC.includes('ux') || messageLC.includes('user experience') || 
                    messageLC.includes('interface') || messageLC.includes('layout')) {
-          // UX/UI related - assign to ux designer
-          const designer = agents.find(a => a.role === 'ux_designer');
+          // UX/UI related - assign to builder since we don't have a specific designer
+          const designer = agents.find(a => a.role === 'developer');
           if (designer) respondingAgentId = designer.id;
         } else if (messageLC.includes('implement') || messageLC.includes('code') || 
                   messageLC.includes('build') || messageLC.includes('develop') || 
                   messageLC.includes('create feature')) {
-          // Implementation related - assign to builder
-          const builder = agents.find(a => a.role === 'builder');
+          // Implementation related - assign to builder (developer role)
+          const builder = agents.find(a => a.role === 'developer');
           if (builder) respondingAgentId = builder.id;
         } else {
           // Default to orchestrator for planning and general queries
-          const orchestrator = agents.find(a => a.role === 'orchestrator');
+          const orchestrator = agents.find(a => a.role === 'coordinator');
           if (orchestrator) respondingAgentId = orchestrator.id;
           
           // If orchestrator not found, just take the first agent
