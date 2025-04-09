@@ -16,6 +16,9 @@ import { insertProjectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Project } from "@/lib/types";
 import { Link } from "wouter";
+import { deleteProject } from "@/lib/agentService";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 const projectSchema = insertProjectSchema.extend({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -25,6 +28,7 @@ const projectSchema = insertProjectSchema.extend({
 export default function ProjectsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const form = useForm<z.infer<typeof projectSchema>>({
     resolver: zodResolver(projectSchema),
@@ -78,6 +82,34 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+    
+    try {
+      await deleteProject(projectToDelete.id);
+      
+      // Invalidate cache
+      await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      
+      // Manually trigger refetch
+      await refetch();
+      
+      toast({
+        title: "Project deleted",
+        description: `"${projectToDelete.name}" and all related data has been deleted.`,
+      });
+      
+      setProjectToDelete(null);
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "planning":
@@ -95,6 +127,25 @@ export default function ProjectsPage() {
 
   return (
     <div className="w-full px-2 sm:px-4 md:px-6 py-4 sm:py-6">
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{projectToDelete?.name}" and all its associated data including tasks, logs, and issues. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700 text-white">
+              Delete Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Projects</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -217,7 +268,16 @@ export default function ProjectsPage() {
               <Separator />
               <CardContent className="pt-3 sm:pt-4 p-3 sm:p-4">
                 <p className="text-xs sm:text-sm text-gray-700 line-clamp-3">{project.description}</p>
-                <div className="mt-3 sm:mt-4 flex justify-end">
+                <div className="mt-3 sm:mt-4 flex justify-between items-center">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs sm:text-sm text-red-600 hover:text-red-700 hover:bg-red-50 p-1 sm:p-2"
+                    onClick={() => setProjectToDelete(project)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
                   <Link href={`/projects/${project.id}`}>
                     <Button variant="outline" size="sm" className="text-xs sm:text-sm">
                       View Details

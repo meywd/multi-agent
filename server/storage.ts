@@ -61,6 +61,7 @@ export interface IStorage {
   getProject(id: number): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
   updateProjectStatus(id: number, status: string): Promise<Project | undefined>;
+  deleteProject(id: number): Promise<boolean>;
   getTasksByProject(projectId: number): Promise<Task[]>;
   
   // Dashboard metrics
@@ -551,6 +552,40 @@ export class MemStorage implements IStorage {
     return Array.from(this.tasks.values())
       .filter(task => task.projectId === projectId);
   }
+  
+  async deleteProject(id: number): Promise<boolean> {
+    const project = this.projects.get(id);
+    if (!project) return false;
+    
+    // Delete associated logs (convert entries to array first for TypeScript compatibility)
+    Array.from(this.logs.entries()).forEach(([logId, log]) => {
+      if (log.projectId === id) {
+        this.logs.delete(logId);
+      }
+    });
+    
+    // Get task IDs for this project
+    const projectTasks = Array.from(this.tasks.values())
+      .filter(task => task.projectId === id);
+    const taskIds = projectTasks.map(task => task.id);
+    
+    // Delete issues related to these tasks (convert entries to array first)
+    Array.from(this.issues.entries()).forEach(([issueId, issue]) => {
+      if (issue.taskId !== null && taskIds.includes(issue.taskId)) {
+        this.issues.delete(issueId);
+      }
+    });
+    
+    // Delete the tasks
+    taskIds.forEach(taskId => {
+      this.tasks.delete(taskId);
+    });
+    
+    // Delete the project
+    this.projects.delete(id);
+    
+    return true;
+  }
 
   // Dashboard metrics
   async getDashboardMetrics(): Promise<{
@@ -958,6 +993,57 @@ export class DatabaseStorage implements IStorage {
       warningIssues,
       verificationRate
     };
+  }
+  
+  async deleteProject(id: number): Promise<boolean> {
+    try {
+      console.log(`Deleting project ${id} and all related data`);
+      
+      // First, delete all related data in the correct order to respect foreign key constraints
+      
+      // 1. Delete associated logs
+      await db.delete(logs)
+        .where(eq(logs.projectId, id))
+        .execute();
+      console.log(`Deleted logs for project ${id}`);
+      
+      // 2. Get all tasks for this project to find their IDs
+      const projectTasks = await this.getTasksByProject(id);
+      const taskIds = projectTasks.map(task => task.id);
+      
+      // 3. Delete issues related to this project's tasks
+      if (taskIds.length > 0) {
+        for (const taskId of taskIds) {
+          await db.delete(issues)
+            .where(eq(issues.taskId, taskId))
+            .execute();
+        }
+        console.log(`Deleted issues for ${taskIds.length} tasks in project ${id}`);
+      }
+      
+      // 4. Delete tasks related to this project
+      await db.delete(tasks)
+        .where(eq(tasks.projectId, id))
+        .execute();
+      console.log(`Deleted tasks for project ${id}`);
+      
+      // 5. Finally, delete the project itself
+      const result = await db.delete(projects)
+        .where(eq(projects.id, id))
+        .returning()
+        .execute();
+      
+      if (result.length === 0) {
+        console.log(`No project deleted with id: ${id}`);
+        return false;
+      }
+      
+      console.log(`Successfully deleted project ${id} and all related data`);
+      return true;
+    } catch (err) {
+      console.error(`Error in deleteProject(${id}):`, err);
+      throw err;
+    }
   }
 
   // Helper method to initialize database with only agents

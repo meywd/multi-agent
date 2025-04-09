@@ -741,6 +741,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Delete a project and all related data (tasks, logs, issues)
+  app.delete('/api/projects/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Check if project exists
+      const project = await storage.getProject(id);
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      // Delete the project and all associated data
+      const success = await storage.deleteProject(id);
+      
+      if (success) {
+        // Broadcast project deletion to all clients
+        broadcastMessage(wss, { type: 'project_deleted', projectId: id });
+        return res.status(200).json({ message: 'Project and all related data deleted successfully' });
+      } else {
+        return res.status(500).json({ message: 'Failed to delete project' });
+      }
+    } catch (err) {
+      console.error('Error deleting project:', err);
+      res.status(500).json({ message: 'Error deleting project' });
+    }
+  });
+  
   // Add endpoint for responding to agent conversations
   app.post('/api/projects/:id/respond', async (req, res) => {
     try {

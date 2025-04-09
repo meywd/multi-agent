@@ -184,6 +184,13 @@ export async function updateProjectStatus(id: number, status: string): Promise<P
   });
 }
 
+export async function deleteProject(id: number): Promise<{ message: string }> {
+  return await apiRequest({
+    method: "DELETE",
+    url: `/api/projects/${id}`
+  });
+}
+
 export async function getTasksByProject(projectId: number): Promise<Task[]> {
   return await apiRequest({
     method: "GET",
