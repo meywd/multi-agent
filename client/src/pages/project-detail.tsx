@@ -23,6 +23,7 @@ import { Project, Task, Log } from "@/lib/types";
 import { Link } from "wouter";
 import { 
   ArrowLeft, 
+  ArrowRight,
   Clock, 
   Calendar, 
   MessageSquare, 
@@ -535,27 +536,47 @@ export default function ProjectDetailPage() {
       ) : (
         <div className="space-y-4">
           {conversations.map((log) => (
-            <Card key={log.id} className="overflow-hidden border-l-4 border-l-primary">
+            <Card key={log.id} className={`overflow-hidden border-l-4 ${log.agentId ? 'border-l-primary' : 'border-l-slate-400'}`}>
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
-                    <div className="bg-primary/10 p-2 rounded-full">
-                      <User className="h-5 w-5 text-primary" />
+                    <div className={`p-2 rounded-full ${log.agentId ? 'bg-primary/10' : 'bg-slate-100'}`}>
+                      {log.agentId ? (
+                        <MessageSquare className="h-5 w-5 text-primary" />
+                      ) : (
+                        <User className="h-5 w-5 text-slate-600" />
+                      )}
                     </div>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <div className="font-medium text-sm">
-                        {log.agentId ? `Agent #${log.agentId}` : "System"} 
-                        {log.targetAgentId && <span className="text-muted-foreground"> → Agent #{log.targetAgentId}</span>}
+                      <div className="font-medium text-sm flex items-center gap-2">
+                        {log.agentId ? (
+                          <>
+                            <span className="text-primary">Agent #{log.agentId}</span>
+                            {log.type && (
+                              <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 font-normal">
+                                {log.type}
+                              </Badge>
+                            )}
+                          </>
+                        ) : (
+                          <span>You</span>
+                        )}
+                        {log.targetAgentId && <span className="text-muted-foreground flex items-center gap-1">
+                          <ArrowRight className="h-3 w-3" /> 
+                          <span>Agent #{log.targetAgentId}</span>
+                        </span>}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {new Date(log.timestamp).toLocaleString()}
                       </div>
                     </div>
-                    <p className="mt-1 text-sm">{log.message}</p>
+                    <div className="mt-2 text-sm prose prose-sm max-w-none">
+                      {log.message}
+                    </div>
                     {log.details && (
-                      <div className="mt-2 bg-muted/50 p-2 rounded text-xs whitespace-pre-wrap">
+                      <div className="mt-3 bg-slate-50 border border-slate-200 p-3 rounded-md text-sm font-mono whitespace-pre-wrap overflow-x-auto text-slate-800">
                         {log.details}
                       </div>
                     )}
