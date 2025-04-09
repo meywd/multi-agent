@@ -572,12 +572,155 @@ export default function ProjectDetailPage() {
                         {new Date(log.timestamp).toLocaleString()}
                       </div>
                     </div>
-                    <div className="mt-2 text-sm prose prose-sm max-w-none">
-                      {log.message}
+                    <div className="mt-2 text-sm prose prose-sm max-w-none prose-headings:font-bold prose-headings:text-primary prose-h1:text-lg prose-h2:text-base prose-h3:text-sm prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                      {(() => {
+                        const lines = log.message.split('\n');
+                        const result = [];
+                        let inUnorderedList = false;
+                        let inOrderedList = false;
+                        let listItems = [];
+                        let listCounter = 0;
+
+                        for (let i = 0; i < lines.length; i++) {
+                          const line = lines[i];
+                          
+                          // Check if line is a heading
+                          if (line.startsWith('# ')) {
+                            // Close any open lists before adding a heading
+                            if (inUnorderedList) {
+                              result.push(<ul key={`ul-${i}`} className="list-disc pl-4">{listItems}</ul>);
+                              listItems = [];
+                              inUnorderedList = false;
+                            } else if (inOrderedList) {
+                              result.push(<ol key={`ol-${i}`} className="list-decimal pl-4">{listItems}</ol>);
+                              listItems = [];
+                              inOrderedList = false;
+                            }
+                            result.push(<h1 key={`h1-${i}`}>{line.substring(2)}</h1>);
+                          } else if (line.startsWith('## ')) {
+                            // Close any open lists before adding a heading
+                            if (inUnorderedList) {
+                              result.push(<ul key={`ul-${i}`} className="list-disc pl-4">{listItems}</ul>);
+                              listItems = [];
+                              inUnorderedList = false;
+                            } else if (inOrderedList) {
+                              result.push(<ol key={`ol-${i}`} className="list-decimal pl-4">{listItems}</ol>);
+                              listItems = [];
+                              inOrderedList = false;
+                            }
+                            result.push(<h2 key={`h2-${i}`}>{line.substring(3)}</h2>);
+                          } else if (line.startsWith('### ')) {
+                            // Close any open lists before adding a heading
+                            if (inUnorderedList) {
+                              result.push(<ul key={`ul-${i}`} className="list-disc pl-4">{listItems}</ul>);
+                              listItems = [];
+                              inUnorderedList = false;
+                            } else if (inOrderedList) {
+                              result.push(<ol key={`ol-${i}`} className="list-decimal pl-4">{listItems}</ol>);
+                              listItems = [];
+                              inOrderedList = false;
+                            }
+                            result.push(<h3 key={`h3-${i}`}>{line.substring(4)}</h3>);
+                          } 
+                          // Check if line starts a list item (-)
+                          else if (line.startsWith('- ')) {
+                            // If we were in an ordered list, close it
+                            if (inOrderedList) {
+                              result.push(<ol key={`ol-${i}`} className="list-decimal pl-4">{listItems}</ol>);
+                              listItems = [];
+                              inOrderedList = false;
+                            }
+                            // Start or continue an unordered list
+                            inUnorderedList = true;
+                            listItems.push(<li key={`li-${i}`}>{line.substring(2)}</li>);
+                          }
+                          // Check if line starts a numbered list (1., 2., etc)
+                          else if (/^\d+\.\s/.test(line)) {
+                            // If we were in an unordered list, close it
+                            if (inUnorderedList) {
+                              result.push(<ul key={`ul-${i}`} className="list-disc pl-4">{listItems}</ul>);
+                              listItems = [];
+                              inUnorderedList = false;
+                            }
+                            // Start or continue an ordered list
+                            inOrderedList = true;
+                            const content = line.substring(line.indexOf('.') + 2);
+                            listItems.push(<li key={`li-${i}`}>{content}</li>);
+                          }
+                          // If line is empty and we're in a list, close the list
+                          else if (line.trim() === '' && (inUnorderedList || inOrderedList)) {
+                            if (inUnorderedList) {
+                              result.push(<ul key={`ul-${i}`} className="list-disc pl-4">{listItems}</ul>);
+                              listItems = [];
+                              inUnorderedList = false;
+                            } else if (inOrderedList) {
+                              result.push(<ol key={`ol-${i}`} className="list-decimal pl-4">{listItems}</ol>);
+                              listItems = [];
+                              inOrderedList = false;
+                            }
+                            result.push(<br key={`br-${i}`} />);
+                          }
+                          // Check if line is bold (starts with ** and ends with **)
+                          else if (line.startsWith('**') && line.endsWith('**')) {
+                            // Close any open lists before adding a bold line
+                            if (inUnorderedList) {
+                              result.push(<ul key={`ul-${i}`} className="list-disc pl-4">{listItems}</ul>);
+                              listItems = [];
+                              inUnorderedList = false;
+                            } else if (inOrderedList) {
+                              result.push(<ol key={`ol-${i}`} className="list-decimal pl-4">{listItems}</ol>);
+                              listItems = [];
+                              inOrderedList = false;
+                            }
+                            result.push(<p key={`p-${i}`}><strong>{line.substring(2, line.length - 2)}</strong></p>);
+                          }
+                          // Empty line outside of a list
+                          else if (line.trim() === '') {
+                            result.push(<br key={`br-${i}`} />);
+                          }
+                          // Default case: regular paragraph
+                          else {
+                            // Close any open lists before adding a paragraph
+                            if (inUnorderedList) {
+                              result.push(<ul key={`ul-${i}`} className="list-disc pl-4">{listItems}</ul>);
+                              listItems = [];
+                              inUnorderedList = false;
+                            } else if (inOrderedList) {
+                              result.push(<ol key={`ol-${i}`} className="list-decimal pl-4">{listItems}</ol>);
+                              listItems = [];
+                              inOrderedList = false;
+                            }
+                            result.push(<p key={`p-${i}`}>{line}</p>);
+                          }
+                        }
+
+                        // Close any open lists at the end
+                        if (inUnorderedList) {
+                          result.push(<ul key="ul-end" className="list-disc pl-4">{listItems}</ul>);
+                        } else if (inOrderedList) {
+                          result.push(<ol key="ol-end" className="list-decimal pl-4">{listItems}</ol>);
+                        }
+
+                        return result;
+                      })()}
                     </div>
                     {log.details && (
                       <div className="mt-3 bg-slate-50 border border-slate-200 p-3 rounded-md text-sm font-mono whitespace-pre-wrap overflow-x-auto text-slate-800">
-                        {log.details}
+                        {log.details.split('\n').map((line, i) => {
+                          // Check if this is a code block boundary with ```
+                          if (line.trim() === '```' || line.match(/^```\w+$/)) {
+                            return null; // Skip the code fence markers
+                          }
+                          // Add syntax highlighting class if inside a code block
+                          if (line.startsWith('    ') || line.startsWith('\t')) {
+                            return (
+                              <div key={i} className="px-2 py-0.5 bg-slate-100 border-l-2 border-primary">
+                                {line}
+                              </div>
+                            );
+                          }
+                          return <div key={i}>{line || ' '}</div>;
+                        })}
                       </div>
                     )}
                     
