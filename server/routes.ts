@@ -8,6 +8,7 @@ import { insertAgentSchema, insertTaskSchema, insertLogSchema, insertIssueSchema
 import { getAgentResponse, analyzeCode, generateCode, verifyImplementation } from "./openai";
 import OpenAI from "openai";
 import { eq } from "drizzle-orm";
+import { setupAuth } from "./auth";
 
 // Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -232,6 +233,9 @@ interface WebSocketClient extends WebSocket {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication
+  setupAuth(app);
+  
   const httpServer = createServer(app);
   
   // Setup WebSocket server
