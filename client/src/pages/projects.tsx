@@ -86,7 +86,10 @@ export default function ProjectsPage() {
     if (!projectToDelete) return;
     
     try {
-      await deleteProject(projectToDelete.id);
+      console.log(`Attempting to delete project ID: ${projectToDelete.id}, Name: ${projectToDelete.name}`);
+      
+      const response = await deleteProject(projectToDelete.id);
+      console.log("Delete project response:", response);
       
       // Invalidate cache
       await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -102,9 +105,15 @@ export default function ProjectsPage() {
       setProjectToDelete(null);
     } catch (error) {
       console.error("Error deleting project:", error);
+      
+      let errorMessage = "Failed to delete the project. Please try again.";
+      if (error instanceof Error) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to delete the project. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }

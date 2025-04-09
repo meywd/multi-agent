@@ -30,7 +30,8 @@ export const agentRoleEnum = pgEnum("agent_role", [
   "coordinator",
   "developer",
   "qa",
-  "tester"
+  "tester",
+  "designer"
 ]);
 
 // Agent schema
