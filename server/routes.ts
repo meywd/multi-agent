@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertAgentSchema, insertTaskSchema, insertLogSchema, insertIssueSchema, insertProjectSchema } from "@shared/schema";
+import { insertAgentSchema, insertTaskSchema, insertLogSchema, insertIssueSchema, insertProjectSchema, tasks, type Task } from "@shared/schema";
 import { getAgentResponse, analyzeCode, generateCode, verifyImplementation } from "./openai";
 import OpenAI from "openai";
 
@@ -11,6 +11,91 @@ import OpenAI from "openai";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Helper function to extract task information from agent responses
+// Function to automatically process tasks assigned to agents
+async function processAgentTask(task: any) { // Using any for simplicity, but represents a Task
+  try {
+    console.log(`Processing task #${task.id} automatically for agent #${task.assignedTo}`);
+    
+    // 1. Get the assigned agent
+    if (!task.assignedTo) {
+      console.error(`No agent assigned for task ${task.id}`);
+      return;
+    }
+    
+    const agent = await storage.getAgent(task.assignedTo);
+    if (!agent) {
+      console.error(`Agent ${task.assignedTo} not found for task ${task.id}`);
+      return;
+    }
+    
+    // 2. Get project information for context
+    const project = task.projectId ? await storage.getProject(task.projectId) : null;
+    
+    // 3. Prepare prompt for the agent based on the task
+    let prompt = `You are assigned to work on the following task:\n\n`;
+    prompt += `Task: ${task.title}\n`;
+    prompt += `Description: ${task.description || 'No description provided'}\n`;
+    prompt += `Priority: ${task.priority}\n`;
+    
+    if (project) {
+      prompt += `Project: ${project.name}\n`;
+      prompt += `Project Description: ${project.description || 'No description provided'}\n`;
+    }
+    
+    prompt += `\nPlease provide your response to this task based on your role as the ${agent.name} (${agent.role}). Include any questions, suggestions, or concerns you have.`;
+    
+    // 4. Get the agent's response
+    const context = {
+      task,
+      project,
+      otherTasks: project ? await storage.getTasksByProject(project.id) : [],
+      recentLogs: agent ? await storage.getLogsByAgent(agent.id) : []
+    };
+    
+    const response = await getAgentResponse(agent, prompt, context);
+    
+    // 5. Log the agent's response
+    const log = await storage.createLog({
+      agentId: agent.id,
+      projectId: task.projectId,
+      type: 'conversation',
+      message: response,
+      details: `Automatic response to task #${task.id}: ${task.title}`
+    });
+    
+    // 6. Update task progress based on agent's role
+    let newProgress = task.progress || 0;
+    let newStatus = task.status;
+    
+    switch (agent.role) {
+      case 'coordinator':  // Orchestrator
+        newProgress = 30;  // Planning phase
+        break;
+      case 'developer':    // Builder
+        newProgress = 50;  // Implementation phase
+        break;
+      case 'qa':           // Debugger
+        newProgress = 70;  // Testing/debugging phase
+        break;
+      case 'tester':       // Verifier
+        newProgress = 90;  // Verification phase
+        break;
+      case 'designer':     // UX Designer
+        newProgress = 60;  // Design phase
+        break;
+    }
+    
+    // 7. Update the task progress
+    if (newProgress > (task.progress || 0)) {
+      await storage.updateTaskProgress(task.id, newProgress);
+    }
+    
+    return log;
+  } catch (error) {
+    console.error(`Error processing task #${task.id} for agent #${task.assignedTo}:`, error);
+  }
+}
+
 async function extractTasksFromResponse(response: string, projectId: number): Promise<Array<{
   title: string;
   description?: string;
@@ -34,7 +119,7 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
           - priority (optional): One of "low", "medium", "high", or "critical" (default is "medium")
           - status (optional): One of "todo", "in_progress", "review", "done", "blocked" (default is "todo")
           - estimatedTime (optional): Numeric value in hours for the estimated completion time
-          - assignedTo (optional): Agent ID number to assign the task to (1=Orchestrator, 2=Builder, 3=Debugger, 4=Verifier)
+          - assignedTo (optional): Agent ID number to assign the task to (1=Orchestrator, 2=Builder, 3=Debugger, 4=Verifier, 5=UX Designer)
           
           The system will automatically add the current projectId to each task.
           
@@ -123,6 +208,7 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
 
 interface WebSocketClient extends WebSocket {
   isAlive: boolean;
+  clientId?: string; // Track unique client ID
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -362,6 +448,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Broadcast task update to all clients
       broadcastMessage(wss, { type: 'task_updated', task });
+      
+      // If the task was just assigned to an agent, trigger automatic processing
+      if (task.assignedTo && status === 'in_progress') {
+        processAgentTask(task);
+      }
     } catch (err) {
       res.status(500).json({ message: 'Error updating task status' });
     }
