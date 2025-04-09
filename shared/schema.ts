@@ -76,6 +76,7 @@ export const taskPriorityEnum = pgEnum("task_priority", [
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id),
+  parentId: integer("parent_id").references(() => tasks.id), // Self-reference for parent-child relationship
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").notNull().default("queued"),
@@ -83,18 +84,21 @@ export const tasks = pgTable("tasks", {
   assignedTo: integer("assigned_to").references(() => agents.id),
   progress: integer("progress").default(0),
   estimatedTime: integer("estimated_time").default(0), // in minutes
+  isFeature: boolean("is_feature").default(false), // Flag to identify if the task is a feature (can have subtasks)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertTaskSchema = createInsertSchema(tasks).pick({
   projectId: true,
+  parentId: true,
   title: true,
   description: true,
   status: true,
   priority: true,
   assignedTo: true,
   estimatedTime: true,
+  isFeature: true,
 });
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;

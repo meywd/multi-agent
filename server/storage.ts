@@ -42,6 +42,12 @@ export interface IStorage {
   updateTaskStatus(id: number, status: string, progress?: number): Promise<Task | undefined>;
   updateTaskProgress(id: number, progress: number): Promise<Task | undefined>;
   
+  // Feature and Subtask methods
+  getFeatures(projectId?: number): Promise<Task[]>;
+  getSubtasks(parentId: number): Promise<Task[]>;
+  createFeature(task: InsertTask): Promise<Task>;
+  createSubtask(task: InsertTask): Promise<Task>;
+  
   // Log methods
   getLogs(): Promise<Log[]>;
   getLogsByAgent(agentId: number): Promise<Log[]>;
@@ -751,6 +757,89 @@ export class DatabaseStorage implements IStorage {
       .where(eq(tasks.id, id))
       .returning();
     return task || undefined;
+  }
+  
+  // Feature and Subtask methods
+  async getFeatures(projectId?: number): Promise<Task[]> {
+    try {
+      let query = db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.isFeature, true));
+      
+      if (projectId !== undefined) {
+        query = query.where(eq(tasks.projectId, projectId));
+      }
+      
+      return await query;
+    } catch (error) {
+      console.error('Error getting features:', error);
+      return [];
+    }
+  }
+  
+  async getSubtasks(parentId: number): Promise<Task[]> {
+    try {
+      return await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.parentId, parentId));
+    } catch (error) {
+      console.error('Error getting subtasks:', error);
+      return [];
+    }
+  }
+  
+  async createFeature(task: InsertTask): Promise<Task> {
+    try {
+      // Ensure it's marked as a feature
+      const featureTask = {
+        ...task,
+        isFeature: true
+      };
+      
+      const [feature] = await db
+        .insert(tasks)
+        .values(featureTask)
+        .returning();
+      
+      return feature;
+    } catch (error) {
+      console.error('Error creating feature:', error);
+      throw error;
+    }
+  }
+  
+  async createSubtask(task: InsertTask): Promise<Task> {
+    try {
+      // Verify parent task exists and is a feature
+      if (!task.parentId) {
+        throw new Error('Parent ID is required for a subtask');
+      }
+      
+      const [parentTask] = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, task.parentId));
+      
+      if (!parentTask) {
+        throw new Error(`Parent task with ID ${task.parentId} not found`);
+      }
+      
+      if (!parentTask.isFeature) {
+        throw new Error(`Parent task with ID ${task.parentId} is not a feature and cannot have subtasks`);
+      }
+      
+      const [subtask] = await db
+        .insert(tasks)
+        .values(task)
+        .returning();
+      
+      return subtask;
+    } catch (error) {
+      console.error('Error creating subtask:', error);
+      throw error;
+    }
   }
   
   // Log methods

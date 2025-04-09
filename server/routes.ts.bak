@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { db, pool } from "./db";
+import { db } from "./db";
 import { z } from "zod";
 import { insertAgentSchema, insertTaskSchema, insertLogSchema, insertIssueSchema, insertProjectSchema, tasks, type Task } from "@shared/schema";
 import { getAgentResponse, analyzeCode, generateCode, verifyImplementation } from "./openai";
@@ -525,7 +525,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Task not found' });
       }
       
-      // Use the pool from the import at the top of the file
+      // Import the pool directly for raw SQL
+      const { pool } = require('./db');
       
       // Just use a direct SQL query to update both fields at once
       const query = `
