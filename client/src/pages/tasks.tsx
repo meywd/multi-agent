@@ -38,6 +38,9 @@ const taskSchema = insertTaskSchema.extend({
   title: z.string().min(3, "Task title must be at least 3 characters long"),
   description: z.string().min(10, "Task description must be at least 10 characters long").optional(),
   estimatedTime: z.coerce.number().min(0).optional(),
+  projectId: z.number({ 
+    required_error: "Please select a project" 
+  }),
 });
 
 export default function TasksPage() {
@@ -55,18 +58,21 @@ export default function TasksPage() {
       priority: "medium",
       assignedTo: undefined,
       estimatedTime: undefined,
+      projectId: undefined,
     },
   });
 
-  const { data: tasks = [], isLoading: isLoadingTasks } = useQuery({
+  // Only get tasks with projectId
+  const { data: tasks = [], isLoading: isLoadingTasks } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
+    select: (data) => data.filter((task) => task.projectId !== null),
   });
 
-  const { data: agents = [], isLoading: isLoadingAgents } = useQuery({
+  const { data: agents = [], isLoading: isLoadingAgents } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
   });
 
-  const { data: projects = [], isLoading: isLoadingProjects } = useQuery({
+  const { data: projects = [], isLoading: isLoadingProjects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
 
@@ -151,7 +157,7 @@ export default function TasksPage() {
 
   const getAgentName = (agentId?: number) => {
     if (!agentId) return "Unassigned";
-    const agent = agents.find((a: Agent) => a.id === agentId);
+    const agent = agents.find(a => a.id === agentId);
     return agent ? agent.name : "Unknown";
   };
 
@@ -249,6 +255,29 @@ export default function TasksPage() {
                     )}
                   />
                 </div>
+                <FormField
+                  control={form.control}
+                  name="projectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs sm:text-sm">Project</FormLabel>
+                      <FormControl>
+                        <select 
+                          className="w-full p-2 border rounded-md text-xs sm:text-sm" 
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                        >
+                          <option value="">Select a project</option>
+                          {projects.map(project => (
+                            <option key={project.id} value={project.id}>{project.name}</option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <FormField
                     control={form.control}
@@ -263,7 +292,7 @@ export default function TasksPage() {
                             onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
                           >
                             <option value="">Unassigned</option>
-                            {agents.map((agent: Agent) => (
+                            {agents.map(agent => (
                               <option key={agent.id} value={agent.id}>{agent.name}</option>
                             ))}
                           </select>

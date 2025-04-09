@@ -18,6 +18,7 @@ export interface Task {
   assignedTo?: number;
   progress: number;
   estimatedTime?: number;
+  projectId?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
