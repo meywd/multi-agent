@@ -26,16 +26,33 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
       messages: [
         {
           role: "system",
-          content: `You are a task extraction assistant. Extract tasks from the following text in a structured format.
-          For each task, identify the following (if present):
-          - title (required)
-          - description (optional)
-          - priority (optional, one of: "low", "medium", "high")
-          - status (optional, default to "queued")
-          - estimatedTime (optional, in hours, numeric)
-          - assignedTo (optional, agent ID number)
+          content: `You are a task extraction assistant integrated with our project management API. Extract tasks from the following text and format them for our API.
+
+          For each task, identify the following properties:
+          - title (required): A clear, specific title for the task
+          - description (optional): Detailed description of what needs to be done
+          - priority (optional): One of "low", "medium", "high", or "critical" (default is "medium")
+          - status (optional): One of "todo", "in_progress", "review", "done", "blocked" (default is "todo")
+          - estimatedTime (optional): Numeric value in hours for the estimated completion time
+          - assignedTo (optional): Agent ID number to assign the task to (1=Orchestrator, 2=Builder, 3=Debugger, 4=Verifier)
           
-          Respond with a JSON array of task objects only. Do not include any explanations or commentary.`
+          The system will automatically add the current projectId to each task.
+          
+          Format your response as a JSON object with a 'tasks' array containing task objects. Example:
+          {
+            "tasks": [
+              {
+                "title": "Implement user authentication",
+                "description": "Create login and signup forms with validation",
+                "priority": "high",
+                "status": "todo",
+                "estimatedTime": 4,
+                "assignedTo": 2
+              }
+            ]
+          }
+          
+          Respond with this JSON structure only, without any additional text.`
         },
         {
           role: "user",
@@ -53,6 +70,9 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
     try {
       const parsedContent = JSON.parse(parsedResponse.choices[0].message.content);
       
+      // Log the parsed content for debugging
+      console.log("Parsed task content:", JSON.stringify(parsedContent, null, 2));
+      
       if (Array.isArray(parsedContent.tasks)) {
         return parsedContent.tasks.map((task: { 
           title: string, 
@@ -61,18 +81,35 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
           status?: string, 
           estimatedTime?: number, 
           assignedTo?: number 
-        }) => ({
-          title: task.title,
-          description: task.description || null,
-          priority: task.priority || "medium",
-          status: task.status || "queued",
-          estimatedTime: task.estimatedTime || null,
-          assignedTo: task.assignedTo || null,
-          projectId
-        }));
+        }) => {
+          // Validate and normalize values according to our schema
+          const validStatuses = ["todo", "in_progress", "review", "done", "blocked"];
+          const validPriorities = ["low", "medium", "high", "critical"];
+          
+          const normalizedStatus = task.status ? 
+            (validStatuses.includes(task.status) ? task.status : "todo") : 
+            "todo";
+            
+          const normalizedPriority = task.priority ? 
+            (validPriorities.includes(task.priority) ? task.priority : "medium") : 
+            "medium";
+          
+          return {
+            title: task.title,
+            description: task.description || null,
+            priority: normalizedPriority,
+            status: normalizedStatus,
+            estimatedTime: task.estimatedTime || null,
+            assignedTo: task.assignedTo || null,
+            projectId
+          };
+        });
       } else {
         // Handle case where the response has tasks directly at the root
-        return Array.isArray(parsedContent) ? parsedContent : [];
+        return Array.isArray(parsedContent) ? parsedContent.map(task => ({
+          ...task,
+          projectId
+        })) : [];
       }
     } catch (error) {
       console.error("Error parsing task JSON:", error);
@@ -743,8 +780,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const projectTasks = await storage.getTasksByProject(projectId);
             
             // Check if the message is asking to create tasks
-            const createTasksRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?/i;
-            const isCreatingTasks = createTasksRegex.test(message.toLowerCase());
+            const createTasksRequestRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?|plan\s+tasks?|break\s+down|divide\s+into\s+tasks?|what\s+tasks|identify\s+tasks?/i;
+            const isRequestingTasks = createTasksRequestRegex.test(message.toLowerCase());
             
             // Generate an agent response based on the message
             const response = await getAgentResponse(agent, message, {
@@ -766,8 +803,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Broadcast the new log
             broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
             
+            // Check if the response appears to contain tasks
+            const responseContainsTasks = /task\s+\d+|tasks?:|\btask\b.*?:|here are the tasks|list of tasks|following tasks|we'll need to|steps to implement|break this down into|implementation steps/i.test(response);
+            
+            // We'll extract tasks if:
+            // 1. User explicitly asked for tasks creation, or
+            // 2. The agent's response appears to contain task descriptions
+            // But only if the agent is coordinator (orchestrator) role
+            const shouldExtractTasks = (isRequestingTasks || responseContainsTasks) && agent.role === 'coordinator';
+            
+            console.log(`Task extraction check: requestingTasks=${isRequestingTasks}, responseTasks=${responseContainsTasks}, shouldExtract=${shouldExtractTasks}`);
+            
             // If user is asking to create tasks and agent is Orchestrator, try to extract tasks
-            if (isCreatingTasks && agent.role === 'coordinator') {
+            if (shouldExtractTasks) {
               try {
                 // Extract task information from the agent's response
                 const taskExtraction = await extractTasksFromResponse(response, projectId);

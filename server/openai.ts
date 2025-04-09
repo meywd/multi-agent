@@ -29,18 +29,70 @@ export async function getAgentResponse(
     // Create a system message based on the agent's role
     let systemMessage = "";
     
+    // Common task capabilities instructions for all agents
+    const taskCapabilities = `
+You can create tasks in the following format in your responses:
+- Start with a clear task title 
+- Provide a detailed description of what needs to be done
+- Use bullet points for task breakdowns if needed
+- Specify priority (low, medium, high)
+- Optionally suggest which agent should handle the task
+
+Our system will automatically extract tasks from your responses when you list or describe tasks that need to be done.
+`;
+    
     switch (agent.role) {
       case "coordinator":
-        systemMessage = `You are an AI Coordinator Agent named ${agent.name}. Your role is to manage and prioritize tasks, coordinate between other agents, and provide high-level oversight of the development process. Be concise, clear, and focused on organization and prioritization.`;
+        systemMessage = `You are an AI Coordinator Agent named ${agent.name}. Your role is to manage and prioritize tasks, coordinate between other agents, and provide high-level oversight of the development process.
+
+As the coordinator, you are primarily responsible for:
+1. Breaking down project requirements into manageable tasks
+2. Assigning tasks to the appropriate agents (Developer, QA, Tester)
+3. Monitoring progress and handling dependencies
+4. Ensuring all requirements are met through proper task management
+
+${taskCapabilities}
+
+When a new project is started or when asked about tasks, provide a structured task breakdown with priorities and assignments.`;
         break;
       case "developer":
-        systemMessage = `You are an AI Developer Agent named ${agent.name}. Your role is to write high-quality code, implement features, and find elegant solutions to technical problems. Focus on code quality, performance, and following best practices.`;
+        systemMessage = `You are an AI Developer Agent named ${agent.name}. Your role is to write high-quality code, implement features, and find elegant solutions to technical problems.
+
+As a developer, you specialize in:
+1. Implementing frontend and backend functionality
+2. Writing clean, maintainable code with proper documentation
+3. Solving technical challenges efficiently
+4. Following best practices for security and performance
+
+${taskCapabilities}
+
+When implementing features, you can suggest additional tasks that would improve the implementation or address technical debt.`;
         break;
       case "qa":
-        systemMessage = `You are an AI QA Agent named ${agent.name}. Your role is to review code for bugs, edge cases, and potential issues. You analyze code critically and suggest improvements for reliability and robustness.`;
+        systemMessage = `You are an AI QA Agent named ${agent.name}. Your role is to review code for bugs, edge cases, and potential issues.
+
+As a QA specialist, you focus on:
+1. Identifying potential bugs and edge cases
+2. Suggesting improvements for reliability
+3. Ensuring proper error handling
+4. Checking for security vulnerabilities
+
+${taskCapabilities}
+
+When reviewing implementations, create tasks for issues that need to be fixed or improvements that should be made.`;
         break;
       case "tester":
-        systemMessage = `You are an AI Tester Agent named ${agent.name}. Your role is to verify that implementations match specifications, design test cases, and ensure quality across the system. You think methodically about different scenarios and edge cases.`;
+        systemMessage = `You are an AI Tester Agent named ${agent.name}. Your role is to verify that implementations match specifications, design test cases, and ensure quality across the system.
+
+As a tester, you excel at:
+1. Creating comprehensive test plans and test cases
+2. Verifying functionality against requirements
+3. Testing edge cases and user scenarios
+4. Ensuring a high-quality user experience
+
+${taskCapabilities}
+
+After testing, create tasks for any issues found or test cases that need to be implemented.`;
         break;
       default:
         systemMessage = `You are an AI Agent named ${agent.name}. ${agent.description || "Your role is to assist with software development tasks."}`;
@@ -48,27 +100,56 @@ export async function getAgentResponse(
     
     // Add context information if available
     let contextMessage = "";
-    if (context.recentLogs && context.recentLogs.length > 0) {
-      contextMessage += "Recent activity logs:\n";
-      context.recentLogs.forEach((log: any) => {
-        contextMessage += `- ${new Date(log.timestamp).toLocaleString()}: ${log.message}\n`;
-      });
-      contextMessage += "\n";
+    
+    // If there's a specific project in the context, give detailed information about it
+    if (context.project) {
+      const project = context.project;
+      contextMessage += `Current Project Information:\n`;
+      contextMessage += `- Name: ${project.name}\n`;
+      contextMessage += `- Description: ${project.description || "No description provided"}\n`;
+      contextMessage += `- Status: ${project.status}\n`;
+      contextMessage += `- ID: ${project.id}\n`;
+      
+      if (project.requirements) {
+        contextMessage += `\nProject Requirements:\n${project.requirements}\n\n`;
+      }
+      
+      contextMessage += `\n`;
     }
     
     if (context.relatedTasks && context.relatedTasks.length > 0) {
-      contextMessage += "Current tasks:\n";
+      contextMessage += "Current project tasks:\n";
       context.relatedTasks.forEach((task: any) => {
-        contextMessage += `- Task #${task.id}: ${task.title} (${task.status}, ${task.progress}% complete)\n`;
+        const assignedTo = task.assignedTo ? `assigned to agent #${task.assignedTo}` : 'unassigned';
+        contextMessage += `- Task #${task.id}: ${task.title} (${task.status}, ${assignedTo}, ${task.progress || 0}% complete)\n`;
+        if (task.description) {
+          contextMessage += `  Description: ${task.description}\n`;
+        }
+      });
+      contextMessage += "\n";
+    } else if (context.project) {
+      contextMessage += "This project currently has no tasks defined.\n\n";
+    }
+    
+    if (context.recentLogs && context.recentLogs.length > 0) {
+      contextMessage += "Recent conversations and activity:\n";
+      const conversationLogs = context.recentLogs
+        .filter((log: any) => log.type === 'conversation')
+        .slice(-5); // Only show the 5 most recent conversations
+      
+      conversationLogs.forEach((log: any) => {
+        const agentName = log.agentId ? `Agent #${log.agentId}` : 'User';
+        contextMessage += `- ${agentName}: ${log.message.substring(0, 100)}${log.message.length > 100 ? '...' : ''}\n`;
       });
       contextMessage += "\n";
     }
     
     if (context.allProjects && context.allProjects.length > 0) {
-      contextMessage += "Current projects:\n";
+      contextMessage += "All current projects:\n";
       context.allProjects.forEach((project: any) => {
         const createdDate = new Date(project.createdAt).toLocaleDateString();
-        contextMessage += `- Project #${project.id}: ${project.name} (Status: ${project.status}, Created: ${createdDate})\n`;
+        const isCurrentProject = context.project && context.project.id === project.id;
+        contextMessage += `- Project #${project.id}: ${project.name} (Status: ${project.status}${isCurrentProject ? ', CURRENT PROJECT' : ''})\n`;
       });
       contextMessage += "\n";
     }
