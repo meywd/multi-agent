@@ -506,7 +506,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcastMessage(wss, { type: 'subtask_created', task: subtask, parentId });
     } catch (error) {
       console.error(`Error creating subtask for task ${req.params.id}:`, error);
-      res.status(500).json({ message: error.message || "Failed to create subtask" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to create subtask";
+      res.status(500).json({ message: errorMessage });
     }
   });
   
@@ -1009,12 +1010,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Broadcast the new log
       broadcastMessage(wss, { type: 'log_created', log: responseLog });
       
-      // Now, have the agent respond (if a target agent was specified)
-      if (agentId) {
+      // Get all agents and select an appropriate responder
+      let respondingAgentId = agentId;
+      
+      if (!respondingAgentId) {
+        // If no agent was specified, find an appropriate one based on the message content
+        const agents = await storage.getAgents();
+        
+        // Determine appropriate agent based on message content and project state
+        // Default to orchestrator for new projects or general queries
+        const messageLC = message.toLowerCase();
+        
+        // Check which phase of development the message seems to be about
+        if (messageLC.includes('bug') || messageLC.includes('error') || messageLC.includes('fix') || 
+            messageLC.includes('issue') || messageLC.includes('debug')) {
+          // Debugging related - assign to debugger
+          const debuggerAgent = agents.find(a => a.role === 'debugger');
+          if (debuggerAgent) respondingAgentId = debuggerAgent.id;
+        } else if (messageLC.includes('test') || messageLC.includes('verify') || 
+                   messageLC.includes('validation') || messageLC.includes('check if')) {
+          // Testing/verification related - assign to verifier
+          const verifier = agents.find(a => a.role === 'verifier');
+          if (verifier) respondingAgentId = verifier.id;
+        } else if (messageLC.includes('design') || messageLC.includes('ui') || 
+                   messageLC.includes('ux') || messageLC.includes('user experience') || 
+                   messageLC.includes('interface') || messageLC.includes('layout')) {
+          // UX/UI related - assign to ux designer
+          const designer = agents.find(a => a.role === 'ux_designer');
+          if (designer) respondingAgentId = designer.id;
+        } else if (messageLC.includes('implement') || messageLC.includes('code') || 
+                  messageLC.includes('build') || messageLC.includes('develop') || 
+                  messageLC.includes('create feature')) {
+          // Implementation related - assign to builder
+          const builder = agents.find(a => a.role === 'builder');
+          if (builder) respondingAgentId = builder.id;
+        } else {
+          // Default to orchestrator for planning and general queries
+          const orchestrator = agents.find(a => a.role === 'orchestrator');
+          if (orchestrator) respondingAgentId = orchestrator.id;
+          
+          // If orchestrator not found, just take the first agent
+          if (!orchestrator && agents.length > 0) {
+            respondingAgentId = agents[0].id;
+          }
+        }
+      }
+      
+      // Now, have the agent respond
+      if (respondingAgentId) {
         try {
-          const agent = await storage.getAgent(agentId);
+          const agent = await storage.getAgent(respondingAgentId);
           
           if (agent) {
+            console.log(`Agent #${agent.id} (${agent.role}) responding to message in project #${projectId}`);
+            
             // Get project tasks for context
             const projectTasks = await storage.getTasksByProject(projectId);
             
@@ -1049,7 +1098,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // 1. User explicitly asked for tasks creation, or
             // 2. The agent's response appears to contain task descriptions
             // But only if the agent is coordinator (orchestrator) role
-            const shouldExtractTasks = (isRequestingTasks || responseContainsTasks) && agent.role === 'coordinator';
+            const shouldExtractTasks = (isRequestingTasks || responseContainsTasks) && 
+                                      (agent.role === 'coordinator' || agent.role === 'orchestrator');
             
             console.log(`Task extraction check: requestingTasks=${isRequestingTasks}, responseTasks=${responseContainsTasks}, shouldExtract=${shouldExtractTasks}`);
             
