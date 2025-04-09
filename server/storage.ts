@@ -18,8 +18,8 @@ import {
   issues,
   projects
 } from "@shared/schema";
-import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "./db";
+import { eq, and, ne, sql, desc, asc, isNull, gt, count } from "drizzle-orm";
 
 export interface IStorage {
   // User methods (kept from original)
@@ -981,5 +981,15 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Temporarily using MemStorage until database migration is properly set up
-export const storage = new MemStorage();
+// Use DatabaseStorage for persistence between application restarts
+export const storage = new DatabaseStorage();
+
+// Initialize the database with default agents if needed
+(async () => {
+  try {
+    await (storage as DatabaseStorage).seedDatabase();
+    console.log("Database initialized with default agents");
+  } catch (error) {
+    console.error("Error initializing database:", error);
+  }
+})();
