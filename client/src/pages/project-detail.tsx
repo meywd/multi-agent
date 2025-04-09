@@ -86,7 +86,8 @@ export default function ProjectDetailPage() {
         queryKey: ["/api/tasks", feature.id, "subtasks"],
         queryFn: () => getSubtasks(feature.id),
         enabled: !!expandedFeatures[feature.id]
-      }))
+      })),
+    combine: (results) => results
   });
   
   // Toggle feature expansion
@@ -300,10 +301,18 @@ export default function ProjectDetailPage() {
             <div className="space-y-4 mb-6">
               {features.map((feature) => {
                 const isExpanded = expandedFeatures[feature.id] || false;
-                const subtaskData = subtasksQueries
-                  .find(q => q.queryKey[1] === feature.id)?.data || [];
-                const isLoading = subtasksQueries
-                  .find(q => q.queryKey[1] === feature.id)?.isLoading || false;
+                // Find the matching query for this feature
+                const featureIndex = features
+                  .filter(f => expandedFeatures[f.id])
+                  .findIndex(f => f.id === feature.id);
+                
+                const subtaskData = featureIndex >= 0 && 
+                  featureIndex < subtasksQueries.length ? 
+                  subtasksQueries[featureIndex]?.data || [] : [];
+                
+                const isLoading = featureIndex >= 0 && 
+                  featureIndex < subtasksQueries.length ? 
+                  subtasksQueries[featureIndex]?.isLoading || false : false;
                 
                 return (
                   <div key={feature.id} className="space-y-2">
