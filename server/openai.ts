@@ -131,7 +131,14 @@ After testing, create tasks for any issues found or test cases that need to be i
       contextMessage += "This project currently has no tasks defined.\n\n";
     }
     
-    if (context.recentLogs && context.recentLogs.length > 0) {
+    // If we have explicit conversation history that was formatted in routes.ts, use that
+    if (context.conversationHistory) {
+      contextMessage += "Recent Conversation History:\n";
+      contextMessage += context.conversationHistory;
+      contextMessage += "\n\n";
+    } 
+    // Otherwise, fall back to the old way of constructing conversation history from logs
+    else if (context.recentLogs && context.recentLogs.length > 0) {
       contextMessage += "Recent conversations and activity:\n";
       const conversationLogs = context.recentLogs
         .filter((log: any) => log.type === 'conversation')

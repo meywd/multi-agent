@@ -1067,6 +1067,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Get project tasks for context
             const projectTasks = await storage.getTasksByProject(projectId);
             
+            // Get all agents for accurate name/role mapping in conversation history
+            const allAgents = await storage.getAgents();
+            
+            // Get the recent conversation logs for context (up to 10 most recent)
+            const recentConversations = await storage.getConversationLogs(projectId);
+            
+            // Format the conversation history
+            const conversationHistory = recentConversations
+              .filter(log => log.type === 'conversation')
+              .slice(-10) // Get the 10 most recent logs
+              .map((log, index) => {
+                // Get the agent's name and role if this is an agent message
+                let role = 'User';
+                if (log.agentId) {
+                  const agentDetails = allAgents.find((a: any) => a.id === log.agentId);
+                  role = agentDetails 
+                    ? `Agent ${agentDetails.name} (${agentDetails.role})`
+                    : `Agent #${log.agentId}`;
+                }
+                // Format the message with a timestamp and sequence number
+                const timestamp = typeof log.timestamp === 'string' || typeof log.timestamp === 'number' || log.timestamp instanceof Date
+                  ? new Date(log.timestamp).toLocaleTimeString() 
+                  : new Date().toLocaleTimeString();
+                return `[${index + 1}] ${timestamp} - ${role}:\n${log.message}`;
+              })
+              .join('\n\n');
+            
             // Check if the message is asking to create tasks
             const createTasksRequestRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?|plan\s+tasks?|break\s+down|divide\s+into\s+tasks?|what\s+tasks|identify\s+tasks?/i;
             const isRequestingTasks = createTasksRequestRegex.test(message.toLowerCase());
@@ -1075,8 +1102,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const response = await getAgentResponse(agent, message, {
               project,
               allProjects: await storage.getProjects(),
-              recentLogs: await storage.getLogsByProject(projectId),
-              relatedTasks: projectTasks
+              relatedTasks: projectTasks,
+              conversationHistory,
+              recentLogs: await storage.getLogsByProject(projectId)
             });
             
             // Create a conversation log from the agent
