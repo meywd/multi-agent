@@ -68,10 +68,10 @@ export default function TaskDetailPage() {
 
   // Determine where to return to based on the task type
   const getBackUrl = () => {
-    if (task.parentId) {
+    if (task.parentId && task.parentId > 0) {
       // If it's a subtask, go back to the feature
       return `/features/${task.parentId}`;
-    } else if (task.projectId) {
+    } else if (task.projectId && task.projectId > 0) {
       // If it's a task or feature, go back to the project
       return `/projects/${task.projectId}`;
     } else {
@@ -91,7 +91,7 @@ export default function TaskDetailPage() {
         </Link>
         
         <h1 className="text-2xl font-bold">
-          {task.isFeature ? "Feature: " : "Task: "}
+          {task.isFeature === true ? "Feature: " : "Task: "}
           {task.title}
         </h1>
       </div>

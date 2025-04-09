@@ -19,6 +19,8 @@ export interface Task {
   progress: number;
   estimatedTime?: number;
   projectId?: number | null;
+  parentId?: number | null;
+  isFeature?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

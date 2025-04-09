@@ -42,7 +42,7 @@ export default function FeatureDetailPage() {
     );
   }
 
-  if (!feature || !feature.isFeature) {
+  if (!feature) {
     return (
       <div className="w-full p-4 sm:p-6 md:p-8">
         <div className="mb-4">
