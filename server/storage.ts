@@ -609,6 +609,29 @@ export class MemStorage implements IStorage {
       .filter(task => task.projectId === projectId);
   }
   
+  async getFeatures(projectId?: number): Promise<Task[]> {
+    return Array.from(this.tasks.values())
+      .filter(task => task.isFeature && (projectId ? task.projectId === projectId : true));
+  }
+
+  async getSubtasks(parentId: number): Promise<Task[]> {
+    return Array.from(this.tasks.values())
+      .filter(task => task.parentId === parentId);
+  }
+
+  async createFeature(task: InsertTask): Promise<Task> {
+    const featureTask = { ...task, isFeature: true };
+    return this.createTask(featureTask);
+  }
+
+  async createSubtask(task: InsertTask): Promise<Task> {
+    // Validate that parent task exists
+    if (task.parentId && !this.tasks.has(task.parentId)) {
+      throw new Error(`Parent task ${task.parentId} does not exist`);
+    }
+    return this.createTask(task);
+  }
+  
   async deleteProject(id: number): Promise<boolean> {
     const project = this.projects.get(id);
     if (!project) return false;

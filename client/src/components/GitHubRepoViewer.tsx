@@ -53,17 +53,17 @@ export function GitHubRepoViewer({ projectId, repository, branch = "main" }: Git
   });
   
   // Mutation to save file changes
-  const commitMutation = useMutation({
+  const commitMutation = useMutation<any, Error, {
+    path: string;
+    content: string;
+    message: string;
+    sha?: string;
+  }>({
     mutationFn: async ({
       path,
       content,
       message,
       sha,
-    }: {
-      path: string;
-      content: string;
-      message: string;
-      sha?: string;
     }) => {
       const res = await apiRequest("POST", `/api/projects/${projectId}/github/commit`, {
         path,

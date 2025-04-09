@@ -531,8 +531,8 @@ export default function ProjectDetailPage() {
               <CardContent className="p-4">
                 <GitHubRepoViewer 
                   projectId={projectId} 
-                  repository={project.githubRepo} 
-                  branch={project.githubBranch}
+                  repository={(project as any).githubRepo} 
+                  branch={(project as any).githubBranch}
                 />
               </CardContent>
             </Card>

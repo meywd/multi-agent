@@ -35,8 +35,8 @@ export function GitHubLinkForm({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const linkMutation = useMutation({
-    mutationFn: async (data: { repository: string; branch: string }) => {
+  const linkMutation = useMutation<any, Error, { repository: string; branch: string }>({
+    mutationFn: async (data) => {
       const res = await apiRequest("POST", `/api/projects/${projectId}/github`, data);
       return await res.json();
     },

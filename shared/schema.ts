@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -85,7 +86,7 @@ export const taskPriorityEnum = pgEnum("task_priority", [
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id),
-  parentId: integer("parent_id").references(() => tasks.id), // Self-reference for parent-child relationship
+  parentId: integer("parent_id"), // Self-reference for parent-child relationship, added via relations
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").notNull().default("queued"),
@@ -213,3 +214,20 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
+
+// Relations - to properly set up self-reference for tasks
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
+  }),
+  parent: one(tasks, {
+    fields: [tasks.parentId],
+    references: [tasks.id],
+  }),
+  subtasks: many(tasks),
+  assignedAgent: one(agents, {
+    fields: [tasks.assignedTo],
+    references: [agents.id],
+  }),
+}));

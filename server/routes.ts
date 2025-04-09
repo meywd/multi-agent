@@ -98,7 +98,7 @@ async function processAgentTask(task: any) { // Using any for simplicity, but re
   }
 }
 
-async function extractTasksFromResponse(response: string, projectId: number): Promise<Array<{
+export async function extractTasksFromResponse(response: string, projectId: number): Promise<Array<{
   title: string;
   description?: string;
   priority?: string;

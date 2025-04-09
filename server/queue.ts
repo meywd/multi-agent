@@ -4,9 +4,20 @@ import { storage } from './storage';
 import { getAgentResponse } from './openai';
 import { extractTasksFromResponse } from './routes';
 
-// Redis connection is automatically handled by Bull using the DATABASE_URL
-const messageQueue = new Queue('agent-messages', process.env.DATABASE_URL);
-const taskQueue = new Queue('task-processing', process.env.DATABASE_URL);
+// Redis connection is automatically handled by Bull
+// Use default Redis configuration or environment variables if available
+const messageQueue = new Queue('agent-messages', {
+  redis: process.env.REDIS_URL || {
+    port: 6379,
+    host: '127.0.0.1'
+  }
+});
+const taskQueue = new Queue('task-processing', {
+  redis: process.env.REDIS_URL || {
+    port: 6379,
+    host: '127.0.0.1'
+  }
+});
 
 // Reference to the WebSocket server for sending updates
 let wss: WebSocketServer | null = null;
@@ -130,7 +141,7 @@ messageQueue.process('process-message', async (job) => {
             : `Agent #${log.agentId}`;
         }
         // Format the message with a timestamp and sequence number
-        const timestamp = new Date(log.timestamp).toLocaleTimeString();
+        const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'Unknown time';
         return `[${index + 1}] ${timestamp} - ${role}:\n${log.message}`;
       })
       .join('\n\n');
@@ -282,9 +293,70 @@ taskQueue.process('process-task', async (job) => {
     const progressTask = await storage.updateTaskProgress(taskId, 50);
     broadcastMessage({ type: 'task_updated', task: progressTask });
     
-    // If this is a Developer/Builder agent, they could generate code
-    if (agent.role === 'developer') {
-      // This would integrate with future code generation/GitHub functionality
+    // If this is a Developer/Builder agent, they could generate code and commit to GitHub
+    if (agent.role === 'developer' && project && project.githubRepo) {
+      try {
+        // Check if we have a GitHub integration for this project
+        console.log(`Developer agent working with GitHub repo: ${project.githubRepo}`);
+        
+        // Get the project owner's GitHub token
+        const projectOwner = project.userId ? await storage.getUser(project.userId) : null;
+        
+        if (projectOwner && projectOwner.githubToken) {
+          const { createGitHubService } = await import('./github');
+          const githubService = await createGitHubService(project.userId);
+          
+          if (githubService.isAuthenticated()) {
+            // Extract repo owner and name from the githubRepo string (format: owner/repo)
+            const [owner, repo] = project.githubRepo.split('/');
+            
+            if (owner && repo) {
+              // Generate a commit message based on the task
+              const commitMessage = `Implement ${task.title} [Task #${task.id}]`;
+              
+              // For simplicity, let's assume we would update a README file with task details
+              // In a real implementation, this would be more sophisticated with actual code generation
+              await githubService.createOrUpdateFile({
+                owner,
+                repo,
+                path: 'README.md',
+                message: commitMessage,
+                content: `# Task Implementation\n\n## ${task.title}\n\n${task.description || 'No description provided'}`,
+                branch: project.githubBranch || 'main'
+              });
+              
+              // Log the commit to the project
+              const commitLog = await storage.createLog({
+                agentId,
+                projectId: project.id,
+                type: 'info',
+                message: `${agent.name} committed changes for task: ${task.title}`,
+                details: `Commit message: ${commitMessage}\nBranch: ${project.githubBranch || 'main'}`
+              });
+              
+              broadcastMessage({ type: 'log_created', log: commitLog });
+              
+              // Update the project's last commit SHA (in a real implementation)
+              // await storage.updateProject(project.id, { lastCommitSha: newCommitSha });
+            }
+          } else {
+            console.log('GitHub service not authenticated, skipping commit');
+          }
+        } else {
+          console.log('Project owner has no GitHub token, skipping commit');
+        }
+      } catch (githubError) {
+        console.error('Error during GitHub commit:', githubError);
+        
+        // Log the error but continue with task completion
+        await storage.createLog({
+          agentId,
+          projectId: project.id,
+          type: 'error',
+          message: `Error committing to GitHub for task: ${task.title}`,
+          details: typeof githubError === 'object' ? JSON.stringify(githubError) : String(githubError)
+        });
+      }
     }
     
     // Complete the task after processing
