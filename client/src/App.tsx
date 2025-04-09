@@ -2,6 +2,8 @@ import { Route, Switch } from "wouter";
 import Dashboard from "@/pages/dashboard";
 import ProjectsPage from "@/pages/projects";
 import ProjectDetailPage from "@/pages/project-detail";
+import FeatureDetailPage from "@/pages/feature-detail";
+import TaskDetailPage from "@/pages/task-detail";
 import PlaygroundPage from "@/pages/playground";
 import AgentsPage from "@/pages/agents";
 import TasksPage from "@/pages/tasks";
@@ -27,6 +29,8 @@ function App() {
             <Route path="/" component={Dashboard} />
             <Route path="/projects" component={ProjectsPage} />
             <Route path="/projects/:id" component={ProjectDetailPage} />
+            <Route path="/features/:id" component={FeatureDetailPage} />
+            <Route path="/tasks/:id" component={TaskDetailPage} />
             <Route path="/agents" component={AgentsPage} />
             <Route path="/tasks" component={TasksPage} />
             <Route path="/playground" component={PlaygroundPage} />

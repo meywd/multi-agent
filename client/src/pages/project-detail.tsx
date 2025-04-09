@@ -331,7 +331,9 @@ export default function ProjectDetailPage() {
                                 <ChevronRight className="h-4 w-4" />}
                             </Button>
                             <CardTitle className="text-base sm:text-lg">
-                              {feature.title}
+                              <Link href={`/features/${feature.id}`} className="hover:underline">
+                                {feature.title}
+                              </Link>
                             </CardTitle>
                           </div>
                           <Badge className={`text-xs ${getTaskStatusColor(feature.status)}`}>
@@ -388,7 +390,11 @@ export default function ProjectDetailPage() {
                             <Card key={subtask.id} className="overflow-hidden">
                               <CardHeader className="p-3 pb-1">
                                 <div className="flex justify-between items-start gap-2">
-                                  <CardTitle className="text-sm">{subtask.title}</CardTitle>
+                                  <CardTitle className="text-sm">
+                                    <Link href={`/tasks/${subtask.id}`} className="hover:underline">
+                                      {subtask.title}
+                                    </Link>
+                                  </CardTitle>
                                   <Badge className={`text-xs ${getTaskStatusColor(subtask.status)}`}>
                                     {formatStatus(subtask.status)}
                                   </Badge>
@@ -462,7 +468,11 @@ export default function ProjectDetailPage() {
                 <Card key={task.id} className="overflow-hidden">
                   <CardHeader className="p-3 pb-1">
                     <div className="flex justify-between items-start gap-2">
-                      <CardTitle className="text-sm">{task.title}</CardTitle>
+                      <CardTitle className="text-sm">
+                        <Link href={`/tasks/${task.id}`} className="hover:underline">
+                          {task.title}
+                        </Link>
+                      </CardTitle>
                       <Badge className={`text-xs ${getTaskStatusColor(task.status)}`}>
                         {formatStatus(task.status)}
                       </Badge>
