@@ -1,10 +1,12 @@
 import { useParams } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { 
   getProject, 
   getTasksByProject, 
   getProjectConversations, 
-  respondToConversation 
+  respondToConversation,
+  getFeatures,
+  getSubtasks
 } from "@/lib/agentService";
 import { 
   Card, 
@@ -26,7 +28,10 @@ import {
   MessageSquare, 
   User, 
   Send, 
-  Reply 
+  Reply,
+  ChevronRight,
+  ChevronDown,
+  Layers
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,6 +55,17 @@ export default function ProjectDetailPage() {
     enabled: !!projectId && !isNaN(projectId)
   });
 
+  // Query for project features
+  const { 
+    data: features = [], 
+    isLoading: isLoadingFeatures
+  } = useQuery({
+    queryKey: ["/api/features", projectId],
+    queryFn: () => getFeatures(projectId),
+    enabled: !!projectId && !isNaN(projectId)
+  });
+  
+  // Query for regular tasks (non-features and non-subtasks)
   const { 
     data: tasks = [], 
     isLoading: isLoadingTasks
@@ -58,6 +74,28 @@ export default function ProjectDetailPage() {
     queryFn: () => getTasksByProject(projectId),
     enabled: !!projectId && !isNaN(projectId)
   });
+
+  // Keep track of expanded features to display their subtasks
+  const [expandedFeatures, setExpandedFeatures] = useState<Record<number, boolean>>({});
+  
+  // Query for subtasks of expanded features
+  const subtasksQueries = useQueries({
+    queries: features
+      .filter(feature => expandedFeatures[feature.id])
+      .map(feature => ({
+        queryKey: ["/api/tasks", feature.id, "subtasks"],
+        queryFn: () => getSubtasks(feature.id),
+        enabled: !!expandedFeatures[feature.id]
+      }))
+  });
+  
+  // Toggle feature expansion
+  const toggleFeatureExpansion = (featureId: number) => {
+    setExpandedFeatures(prev => ({
+      ...prev,
+      [featureId]: !prev[featureId]
+    }));
+  };
   
   const {
     data: conversations = [],
@@ -226,78 +264,235 @@ export default function ProjectDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="mb-4">
-        <h2 className="text-lg sm:text-xl font-semibold flex items-center">
-          <span>Tasks</span>
-          <Badge className="ml-2 text-xs">{tasks.length}</Badge>
-        </h2>
-      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Features Section */}
+        <div className="sm:col-span-2 lg:col-span-2">
+          <div className="mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold flex items-center">
+              <Layers className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+              <span>Features</span>
+              <Badge className="ml-2 text-xs">{features.length}</Badge>
+            </h2>
+          </div>
 
-      {isLoadingTasks ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {[1, 2].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="p-3 sm:p-4">
-                <div className="h-4 sm:h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-3 sm:h-4 bg-gray-200 rounded w-1/3"></div>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                <div className="h-3 sm:h-4 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-3 sm:h-4 bg-gray-200 rounded w-5/6"></div>
+          {isLoadingFeatures ? (
+            <div className="space-y-4">
+              {[1, 2].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader className="p-4">
+                    <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : features.length === 0 ? (
+            <Card className="text-center p-6 mb-6">
+              <CardContent>
+                <p className="text-muted-foreground text-sm">No features have been defined for this project yet.</p>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : tasks.length === 0 ? (
-        <Card className="text-center p-6">
-          <CardContent>
-            <p className="text-muted-foreground text-xs sm:text-sm">No tasks have been assigned to this project yet.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {tasks.map((task) => (
-            <Card key={task.id} className="overflow-hidden">
-              <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-                <div className="flex justify-between items-start gap-2">
-                  <CardTitle className="text-sm sm:text-base">{task.title}</CardTitle>
-                  <Badge className={`text-xs ${getTaskStatusColor(task.status)}`}>
-                    {formatStatus(task.status)}
-                  </Badge>
-                </div>
-                <CardDescription className="text-xs flex items-center gap-1 mt-1">
-                  <Clock className="h-3 w-3" />
-                  <span>
-                    {task.estimatedTime 
-                      ? `${task.estimatedTime} hours estimated`
-                      : "No time estimate"}
-                  </span>
-                </CardDescription>
-              </CardHeader>
-              <Separator />
-              <CardContent className="p-3 sm:p-4 pt-2 sm:pt-3">
-                <p className="text-xs sm:text-sm text-neutral-700 line-clamp-2">
-                  {task.description || "No description provided."}
-                </p>
-                <div className="mt-3 flex justify-between items-center">
-                  <div className="text-xs text-neutral-500">
-                    Priority: <span className="font-medium">{task.priority}</span>
+          ) : (
+            <div className="space-y-4 mb-6">
+              {features.map((feature) => {
+                const isExpanded = expandedFeatures[feature.id] || false;
+                const subtaskData = subtasksQueries
+                  .find(q => q.queryKey[1] === feature.id)?.data || [];
+                const isLoading = subtasksQueries
+                  .find(q => q.queryKey[1] === feature.id)?.isLoading || false;
+                
+                return (
+                  <div key={feature.id} className="space-y-2">
+                    <Card className="overflow-hidden border-2 border-primary/10">
+                      <CardHeader className="p-4 pb-2">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex items-start gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0 rounded-full"
+                              onClick={() => toggleFeatureExpansion(feature.id)}
+                            >
+                              {isExpanded ? 
+                                <ChevronDown className="h-4 w-4" /> : 
+                                <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                            <CardTitle className="text-base sm:text-lg">
+                              {feature.title}
+                            </CardTitle>
+                          </div>
+                          <Badge className={`text-xs ${getTaskStatusColor(feature.status)}`}>
+                            {formatStatus(feature.status)}
+                          </Badge>
+                        </div>
+                        <CardDescription className="text-xs flex items-center gap-1 mt-1 ml-8">
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {feature.estimatedTime 
+                              ? `${feature.estimatedTime} hours estimated`
+                              : "No time estimate"}
+                          </span>
+                        </CardDescription>
+                      </CardHeader>
+                      <Separator />
+                      <CardContent className="p-4 pt-3">
+                        <p className="text-xs sm:text-sm text-neutral-700 ml-8">
+                          {feature.description || "No description provided."}
+                        </p>
+                        <div className="mt-3 flex justify-between items-center">
+                          <div className="text-xs text-neutral-500 ml-8">
+                            Priority: <span className="font-medium">{feature.priority}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary" 
+                                style={{ width: `${feature.progress}%` }}
+                              ></div>
+                            </div>
+                            <span className="ml-2 text-xs">{feature.progress}%</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    {/* Subtasks section (conditional rendering) */}
+                    {isExpanded && (
+                      <div className="ml-6 pl-6 border-l-2 border-gray-200 space-y-2">
+                        {isLoading ? (
+                          <div className="animate-pulse space-y-3 py-2">
+                            <div className="h-12 bg-gray-200 rounded"></div>
+                            <div className="h-12 bg-gray-200 rounded"></div>
+                          </div>
+                        ) : subtaskData.length === 0 ? (
+                          <Card className="border border-dashed">
+                            <CardContent className="p-3 text-center">
+                              <p className="text-xs text-muted-foreground">No subtasks for this feature</p>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          subtaskData.map(subtask => (
+                            <Card key={subtask.id} className="overflow-hidden">
+                              <CardHeader className="p-3 pb-1">
+                                <div className="flex justify-between items-start gap-2">
+                                  <CardTitle className="text-sm">{subtask.title}</CardTitle>
+                                  <Badge className={`text-xs ${getTaskStatusColor(subtask.status)}`}>
+                                    {formatStatus(subtask.status)}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <Separator />
+                              <CardContent className="p-3 pt-2">
+                                <p className="text-xs text-neutral-700 line-clamp-2">
+                                  {subtask.description || "No description provided."}
+                                </p>
+                                <div className="mt-2 flex justify-between items-center">
+                                  <div className="text-xs text-neutral-500">
+                                    Priority: <span className="font-medium">{subtask.priority}</span>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                      <div 
+                                        className="h-full bg-primary" 
+                                        style={{ width: `${subtask.progress}%` }}
+                                      ></div>
+                                    </div>
+                                    <span className="ml-1 text-xs">{subtask.progress}%</span>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center">
-                    <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary" 
-                        style={{ width: `${task.progress}%` }}
-                      ></div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        
+        {/* Regular Tasks Section */}
+        <div className="sm:col-span-2 lg:col-span-1">
+          <div className="mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold flex items-center">
+              <span>Tasks</span>
+              <Badge className="ml-2 text-xs">{tasks.length}</Badge>
+            </h2>
+          </div>
+
+          {isLoadingTasks ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader className="p-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : tasks.length === 0 ? (
+            <Card className="text-center p-4">
+              <CardContent>
+                <p className="text-muted-foreground text-xs sm:text-sm">No regular tasks in this project.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <Card key={task.id} className="overflow-hidden">
+                  <CardHeader className="p-3 pb-1">
+                    <div className="flex justify-between items-start gap-2">
+                      <CardTitle className="text-sm">{task.title}</CardTitle>
+                      <Badge className={`text-xs ${getTaskStatusColor(task.status)}`}>
+                        {formatStatus(task.status)}
+                      </Badge>
                     </div>
-                    <span className="ml-2 text-xs">{task.progress}%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    <CardDescription className="text-xs flex items-center gap-1 mt-1">
+                      <Clock className="h-3 w-3" />
+                      <span>
+                        {task.estimatedTime 
+                          ? `${task.estimatedTime} hours estimated`
+                          : "No time estimate"}
+                      </span>
+                    </CardDescription>
+                  </CardHeader>
+                  <Separator />
+                  <CardContent className="p-3 pt-2">
+                    <p className="text-xs text-neutral-700 line-clamp-2">
+                      {task.description || "No description provided."}
+                    </p>
+                    <div className="mt-2 flex justify-between items-center">
+                      <div className="text-xs text-neutral-500">
+                        Priority: <span className="font-medium">{task.priority}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary" 
+                            style={{ width: `${task.progress}%` }}
+                          ></div>
+                        </div>
+                        <span className="ml-1 text-xs">{task.progress}%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
       
       <div className="mt-8 mb-4">
         <h2 className="text-lg sm:text-xl font-semibold flex items-center">

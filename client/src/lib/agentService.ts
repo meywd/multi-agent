@@ -198,6 +198,42 @@ export async function getTasksByProject(projectId: number): Promise<Task[]> {
   });
 }
 
+// Feature operations
+export async function getFeatures(projectId?: number): Promise<Task[]> {
+  const url = projectId ? `/api/features?projectId=${projectId}` : '/api/features';
+  return await apiRequest({
+    method: "GET",
+    url
+  });
+}
+
+export async function createFeature(feature: Omit<Task, "id" | "createdAt" | "updatedAt" | "progress">): Promise<Task> {
+  return await apiRequest({
+    method: "POST",
+    url: "/api/features",
+    body: feature
+  });
+}
+
+// Subtask operations
+export async function getSubtasks(parentId: number): Promise<Task[]> {
+  return await apiRequest({
+    method: "GET",
+    url: `/api/tasks/${parentId}/subtasks`
+  });
+}
+
+export async function createSubtask(
+  parentId: number,
+  subtask: Omit<Task, "id" | "createdAt" | "updatedAt" | "progress" | "parentId">
+): Promise<Task> {
+  return await apiRequest({
+    method: "POST",
+    url: `/api/tasks/${parentId}/subtasks`,
+    body: subtask
+  });
+}
+
 export async function getLogsByProject(projectId: number): Promise<Log[]> {
   return await apiRequest({
     method: "GET",
