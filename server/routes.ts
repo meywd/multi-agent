@@ -113,28 +113,40 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
       messages: [
         {
           role: "system",
-          content: `You are a task extraction assistant integrated with our project management API. Extract tasks from the following text and format them for our API.
+          content: `You are a task extraction assistant integrated with our project management API. Extract tasks and features from the following text and format them for our API.
 
-          For each task, identify the following properties:
+          For each task or feature, identify the following properties:
           - title (required): A clear, specific title for the task
           - description (optional): Detailed description of what needs to be done
           - priority (optional): One of "low", "medium", "high", or "critical" (default is "medium")
           - status (optional): One of "todo", "in_progress", "review", "done", "blocked" (default is "todo")
           - estimatedTime (optional): Numeric value in hours for the estimated completion time
           - assignedTo (optional): Agent ID number to assign the task to (1=Orchestrator, 2=Builder, 3=Debugger, 4=Verifier, 5=UX Designer)
+          - isFeature (optional): Boolean value indicating whether this is a feature (higher-level item) rather than a regular task. Set to true for major features.
+          - parentId (optional): The ID of the parent task or feature that this task belongs to, if applicable
           
-          The system will automatically add the current projectId to each task.
+          The system will automatically add the current projectId to each task/feature.
           
           Format your response as a JSON object with a 'tasks' array containing task objects. Example:
           {
             "tasks": [
               {
-                "title": "Implement user authentication",
-                "description": "Create login and signup forms with validation",
+                "title": "User Authentication System",
+                "description": "Implement complete authentication system with login/signup",
                 "priority": "high",
                 "status": "todo",
-                "estimatedTime": 4,
-                "assignedTo": 2
+                "estimatedTime": 8,
+                "assignedTo": 2,
+                "isFeature": true
+              },
+              {
+                "title": "Implement login form",
+                "description": "Create login form with email/password fields and validation",
+                "priority": "medium",
+                "status": "todo",
+                "estimatedTime": 2,
+                "assignedTo": 2,
+                "parentId": 1
               }
             ]
           }
@@ -167,7 +179,9 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
           priority?: string, 
           status?: string, 
           estimatedTime?: number, 
-          assignedTo?: number 
+          assignedTo?: number,
+          isFeature?: boolean,
+          parentId?: number
         }) => {
           // Validate and normalize values according to our schema
           const validStatuses = ["todo", "in_progress", "review", "done", "blocked"];
@@ -188,6 +202,8 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
             status: normalizedStatus,
             estimatedTime: task.estimatedTime || null,
             assignedTo: task.assignedTo || null,
+            isFeature: task.isFeature || false,
+            parentId: task.parentId || null,
             projectId
           };
         });
@@ -195,6 +211,8 @@ async function extractTasksFromResponse(response: string, projectId: number): Pr
         // Handle case where the response has tasks directly at the root
         return Array.isArray(parsedContent) ? parsedContent.map(task => ({
           ...task,
+          isFeature: task.isFeature || false,
+          parentId: task.parentId || null,
           projectId
         })) : [];
       }
@@ -981,6 +999,308 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // GitHub integration endpoints
+  
+  // Link a GitHub repository to a project
+  app.post('/api/projects/:id/github', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: 'Invalid project ID format' });
+      }
+      
+      const { repository, branch } = req.body;
+      
+      if (!repository) {
+        return res.status(400).json({ error: 'Repository name is required' });
+      }
+      
+      // Verify repository format (owner/repo)
+      if (!repository.includes('/')) {
+        return res.status(400).json({ 
+          error: 'Invalid repository format. Please use the format owner/repository'
+        });
+      }
+      
+      // Get the project
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: `Project with ID ${projectId} not found` });
+      }
+      
+      // Check if the user owns the project
+      if (project.userId && project.userId !== req.user.id) {
+        return res.status(403).json({ error: 'You do not have permission to update this project' });
+      }
+      
+      // Create GitHub service with user's token
+      const { createGitHubService } = await import('./github');
+      const githubService = await createGitHubService(req.user.id);
+      
+      if (!githubService.isAuthenticated()) {
+        return res.status(401).json({ 
+          error: 'GitHub token not configured or invalid. Please add your GitHub token in your profile.'
+        });
+      }
+      
+      // Verify repository exists and is accessible
+      try {
+        const [owner, repo] = repository.split('/');
+        await githubService.getRepository(owner, repo);
+      } catch (githubError) {
+        return res.status(400).json({ 
+          error: `GitHub repository error: ${githubError.message || 'Repository not found or not accessible'}`
+        });
+      }
+      
+      // Update project with GitHub information
+      const updatedProject = await db
+        .update(projects)
+        .set({ 
+          githubRepo: repository,
+          githubBranch: branch || 'main',
+          updatedAt: new Date()
+        })
+        .where(eq(projects.id, projectId))
+        .returning();
+      
+      // Broadcast project update
+      broadcastMessage(wss, { 
+        type: 'project_updated', 
+        project: updatedProject[0]
+      });
+      
+      res.status(200).json(updatedProject[0]);
+    } catch (error) {
+      console.error('Error linking GitHub repository:', error);
+      res.status(500).json({ error: 'Failed to link GitHub repository' });
+    }
+  });
+  
+  // Get repository content
+  app.get('/api/projects/:id/github/content', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: 'Invalid project ID format' });
+      }
+      
+      const { path } = req.query;
+      
+      // Get the project
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: `Project with ID ${projectId} not found` });
+      }
+      
+      // Check if GitHub repository is linked
+      if (!project.githubRepo) {
+        return res.status(400).json({ error: 'No GitHub repository linked to this project' });
+      }
+      
+      // Check if the user has access to the project
+      if (project.userId && project.userId !== req.user.id) {
+        return res.status(403).json({ error: 'You do not have permission to access this project' });
+      }
+      
+      // Create GitHub service with user's token
+      const { createGitHubService } = await import('./github');
+      const githubService = await createGitHubService(req.user.id);
+      
+      if (!githubService.isAuthenticated()) {
+        return res.status(401).json({ 
+          error: 'GitHub token not configured or invalid. Please add your GitHub token in your profile.'
+        });
+      }
+      
+      // Get repository content
+      const [owner, repo] = project.githubRepo.split('/');
+      const content = await githubService.getFileContent(
+        owner, 
+        repo, 
+        path?.toString() || '',
+        project.githubBranch || 'main'
+      );
+      
+      res.status(200).json(content);
+    } catch (error) {
+      console.error('Error fetching GitHub content:', error);
+      res.status(500).json({ error: 'Failed to fetch GitHub content' });
+    }
+  });
+  
+  // Commit file to repository
+  app.post('/api/projects/:id/github/commit', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: 'Invalid project ID format' });
+      }
+      
+      const { path, content, message, sha } = req.body;
+      
+      if (!path || !content) {
+        return res.status(400).json({ error: 'Path and content are required' });
+      }
+      
+      // Get the project
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: `Project with ID ${projectId} not found` });
+      }
+      
+      // Check if GitHub repository is linked
+      if (!project.githubRepo) {
+        return res.status(400).json({ error: 'No GitHub repository linked to this project' });
+      }
+      
+      // Check if the user has access to the project
+      if (project.userId && project.userId !== req.user.id) {
+        return res.status(403).json({ error: 'You do not have permission to modify this project' });
+      }
+      
+      // Create GitHub service with user's token
+      const { createGitHubService } = await import('./github');
+      const githubService = await createGitHubService(req.user.id);
+      
+      if (!githubService.isAuthenticated()) {
+        return res.status(401).json({ 
+          error: 'GitHub token not configured or invalid. Please add your GitHub token in your profile.'
+        });
+      }
+      
+      // Commit the file
+      const [owner, repo] = project.githubRepo.split('/');
+      const commitMessage = message || `Update ${path}`;
+      const result = await githubService.createOrUpdateFile(
+        owner,
+        repo,
+        path,
+        content,
+        commitMessage,
+        project.githubBranch || 'main',
+        sha
+      );
+      
+      // Update last commit SHA
+      await db
+        .update(projects)
+        .set({ lastCommitSha: result.commit.sha })
+        .where(eq(projects.id, projectId));
+      
+      // Log the file change
+      await storage.createLog({
+        message: `File ${path} committed to GitHub repository`,
+        type: 'info',
+        projectId,
+        details: JSON.stringify({
+          file: path,
+          message: commitMessage,
+          sha: result.commit.sha
+        })
+      });
+      
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error committing to GitHub:', error);
+      res.status(500).json({ error: 'Failed to commit to GitHub: ' + error.message });
+    }
+  });
+  
+  // Create multiple file commit
+  app.post('/api/projects/:id/github/commit-batch', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: 'Invalid project ID format' });
+      }
+      
+      const { files, message } = req.body;
+      
+      if (!files || !Array.isArray(files) || files.length === 0) {
+        return res.status(400).json({ error: 'Files array is required' });
+      }
+      
+      // Get the project
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: `Project with ID ${projectId} not found` });
+      }
+      
+      // Check if GitHub repository is linked
+      if (!project.githubRepo) {
+        return res.status(400).json({ error: 'No GitHub repository linked to this project' });
+      }
+      
+      // Check if the user has access to the project
+      if (project.userId && project.userId !== req.user.id) {
+        return res.status(403).json({ error: 'You do not have permission to modify this project' });
+      }
+      
+      // Create GitHub service with user's token
+      const { createGitHubService } = await import('./github');
+      const githubService = await createGitHubService(req.user.id);
+      
+      if (!githubService.isAuthenticated()) {
+        return res.status(401).json({ 
+          error: 'GitHub token not configured or invalid. Please add your GitHub token in your profile.'
+        });
+      }
+      
+      // Create batch commit
+      const [owner, repo] = project.githubRepo.split('/');
+      const commitMessage = message || `Multi-file update`;
+      
+      const result = await githubService.createCommit(
+        owner,
+        repo,
+        project.githubBranch || 'main',
+        commitMessage,
+        files
+      );
+      
+      // Update last commit SHA
+      await db
+        .update(projects)
+        .set({ lastCommitSha: result.sha })
+        .where(eq(projects.id, projectId));
+      
+      // Log the batch change
+      await storage.createLog({
+        message: `Batch commit of ${files.length} files to GitHub repository`,
+        type: 'info',
+        projectId,
+        details: JSON.stringify({
+          fileCount: files.length,
+          fileNames: files.map(f => f.path),
+          message: commitMessage,
+          sha: result.sha
+        })
+      });
+      
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error creating batch commit to GitHub:', error);
+      res.status(500).json({ error: 'Failed to create batch commit: ' + error.message });
+    }
+  });
+  
   // Add endpoint for responding to agent conversations
   app.post('/api/projects/:id/respond', async (req, res) => {
     try {
@@ -1061,7 +1381,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const agent = await storage.getAgent(respondingAgentId);
           
-          if (agent) {
+          // In project view (when no specific agentId is targeted), only Orchestrator (coordinator) should respond to messages
+          // If it's a direct agent message (has agentId) then any agent can respond
+          if (agent && (agentId === null && agent.role !== 'coordinator')) {
+            console.log(`Agent #${agent.id} has role ${agent.role} but only coordinator can respond in project view. Skipping.`);
+          } else if (agent) {
             console.log(`Agent #${agent.id} (${agent.role}) responding to message in project #${projectId}`);
             
             // Get project tasks for context
@@ -1094,8 +1418,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .join('\n\n');
             
-            // Check if the message is asking to create tasks
-            const createTasksRequestRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?|plan\s+tasks?|break\s+down|divide\s+into\s+tasks?|what\s+tasks|identify\s+tasks?/i;
+            // Check if the message is asking to create tasks or features
+            const createTasksRequestRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?|plan\s+tasks?|break\s+down|divide\s+into\s+tasks?|what\s+tasks|identify\s+tasks?|create\s+features?|add\s+features?|make\s+features?|start\s+features?|plan\s+features?|what\s+features|identify\s+features?/i;
             const isRequestingTasks = createTasksRequestRegex.test(message.toLowerCase());
             
             // Generate an agent response based on the message
@@ -1119,19 +1443,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Broadcast the new log
             broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
             
-            // Check if the response appears to contain tasks
-            const responseContainsTasks = /task\s+\d+|tasks?:|\btask\b.*?:|here are the tasks|list of tasks|following tasks|we'll need to|steps to implement|break this down into|implementation steps/i.test(response);
+            // Check if the response appears to contain tasks or features
+            const responseContainsTasks = /task\s+\d+|tasks?:|\btask\b.*?:|here are the tasks|list of tasks|following tasks|we'll need to|steps to implement|break this down into|implementation steps|features?:|\bfeature\b.*?:|here are the features|list of features|following features/i.test(response);
             
             // We'll extract tasks if:
             // 1. User explicitly asked for tasks creation, or
             // 2. The agent's response appears to contain task descriptions
-            // But only if the agent is coordinator (orchestrator) role
-            const shouldExtractTasks = (isRequestingTasks || responseContainsTasks) && 
-                                      (agent.role === 'coordinator' || agent.role === 'orchestrator');
+            // Now allowing all agent types to create tasks/features
+            const shouldExtractTasks = isRequestingTasks || responseContainsTasks;
             
             console.log(`Task extraction check: requestingTasks=${isRequestingTasks}, responseTasks=${responseContainsTasks}, shouldExtract=${shouldExtractTasks}`);
             
-            // If user is asking to create tasks and agent is Orchestrator, try to extract tasks
+            // If the message or response contains task descriptions, extract them
             if (shouldExtractTasks) {
               try {
                 // Extract task information from the agent's response

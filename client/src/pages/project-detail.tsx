@@ -32,12 +32,17 @@ import {
   Reply,
   ChevronRight,
   ChevronDown,
-  Layers
+  Layers,
+  Github,
+  Code,
+  FileCode
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { GitHubLinkForm } from "@/components/GitHubLinkForm";
+import { GitHubRepoViewer } from "@/components/GitHubRepoViewer";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -435,6 +440,7 @@ export default function ProjectDetailPage() {
         
         {/* Regular Tasks Section */}
         <div className="sm:col-span-2 lg:col-span-1">
+          {/* Tasks Section */}
           <div className="mb-4">
             <h2 className="text-lg sm:text-xl font-semibold flex items-center">
               <span>Tasks</span>
@@ -511,6 +517,26 @@ export default function ProjectDetailPage() {
               ))}
             </div>
           )}
+          
+          {/* GitHub Repository Section */}
+          <div className="mt-6">
+            <div className="mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold flex items-center">
+                <Github className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                <span>GitHub Repository</span>
+              </h2>
+            </div>
+            
+            <Card>
+              <CardContent className="p-4">
+                <GitHubRepoViewer 
+                  projectId={projectId} 
+                  repository={project.githubRepo} 
+                  branch={project.githubBranch}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
       

@@ -22,10 +22,14 @@ import { db } from "./db";
 import { eq, and, ne, sql, desc, asc, isNull, gt, count } from "drizzle-orm";
 
 export interface IStorage {
-  // User methods (kept from original)
+  // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
+  updateUserLastLogin(id: number): Promise<User | undefined>;
+  updateUserPassword(id: number, hashedPassword: string): Promise<User | undefined>;
   
   // Agent methods
   getAgents(): Promise<Agent[]>;
@@ -280,7 +284,7 @@ export class MemStorage implements IStorage {
     });
   }
 
-  // User methods (kept from original)
+  // User methods
   async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
@@ -290,12 +294,54 @@ export class MemStorage implements IStorage {
       (user) => user.username === username,
     );
   }
+  
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.email === email,
+    );
+  }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
+    const createdAt = new Date();
+    const user: User = { 
+      ...insertUser, 
+      id,
+      createdAt,
+      role: 'user',
+      githubUsername: null,
+      githubToken: null,
+      lastLogin: null
+    };
     this.users.set(id, user);
     return user;
+  }
+  
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser = { ...user, ...updates };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateUserLastLogin(id: number): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser = { ...user, lastLogin: new Date() };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateUserPassword(id: number, hashedPassword: string): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser = { ...user, password: hashedPassword };
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
 
   // Agent methods
@@ -519,6 +565,10 @@ export class MemStorage implements IStorage {
       name: insertProject.name,
       status: insertProject.status || 'planning',
       description: insertProject.description || null,
+      userId: insertProject.userId || null,
+      githubRepo: insertProject.githubRepo || null,
+      githubBranch: insertProject.githubBranch || null,
+      lastCommitSha: null,
       createdAt, 
       updatedAt,
       completedAt: null
@@ -649,13 +699,55 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
   }
+  
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    const now = new Date();
+    const userData = {
+      ...insertUser,
+      createdAt: now,
+      role: 'user',
+      githubUsername: null,
+      githubToken: null,
+      lastLogin: null
+    };
+    
     const [user] = await db
       .insert(users)
-      .values(insertUser)
+      .values(userData)
       .returning();
     return user;
+  }
+  
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+  
+  async updateUserLastLogin(id: number): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ lastLogin: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+  
+  async updateUserPassword(id: number, hashedPassword: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
   }
   
   // Agent methods
@@ -969,6 +1061,10 @@ export class DatabaseStorage implements IStorage {
         name: insertProject.name,
         description: insertProject.description || null,
         status: insertProject.status || 'planning',
+        userId: insertProject.userId || null,
+        githubRepo: insertProject.githubRepo || null,
+        githubBranch: insertProject.githubBranch || null,
+        lastCommitSha: null,
         createdAt: now,
         updatedAt: now,
         completedAt: null

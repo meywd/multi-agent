@@ -2,16 +2,25 @@ import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "driz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User schema (kept from original)
+// User schema with enhanced fields
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  email: text("email").unique(),
+  fullName: text("full_name"),
+  role: text("role").default("user"),
+  githubUsername: text("github_username"),
+  githubToken: text("github_token"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastLogin: timestamp("last_login"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  email: true,
+  fullName: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -181,18 +190,25 @@ export const projectStatusEnum = pgEnum("project_status", [
 // Project schema
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id), // Owner of the project
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("planning"),
+  githubRepo: text("github_repo"), // GitHub repository name (owner/repo)
+  githubBranch: text("github_branch").default("main"), // GitHub branch to work with
+  lastCommitSha: text("last_commit_sha"), // Last commit SHA
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });
 
 export const insertProjectSchema = createInsertSchema(projects).pick({
+  userId: true,
   name: true,
   description: true,
   status: true,
+  githubRepo: true,
+  githubBranch: true,
 });
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
