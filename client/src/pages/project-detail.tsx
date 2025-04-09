@@ -535,7 +535,7 @@ export default function ProjectDetailPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {conversations.map((log) => (
+          {[...conversations].reverse().map((log) => (
             <Card key={log.id} className={`overflow-hidden border-l-4 ${log.agentId ? 'border-l-primary' : 'border-l-slate-400'}`}>
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
