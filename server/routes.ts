@@ -241,6 +241,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup WebSocket server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
+  // Set the WebSocketServer in the queue module to allow broadcasting
+  import('./queue').then(queue => {
+    queue.setWebSocketServer(wss);
+  });
+  
   // Handle WebSocket connections
   wss.on('connection', (ws: WebSocketClient) => {
     ws.isAlive = true;
@@ -1334,168 +1339,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Broadcast the new log
       broadcastMessage(wss, { type: 'log_created', log: responseLog });
       
-      // Get all agents and select an appropriate responder
-      let respondingAgentId = agentId;
-      
-      if (!respondingAgentId) {
-        // If no agent was specified, find an appropriate one based on the message content
-        const agents = await storage.getAgents();
+      // Import the queue functions and queue the message for asynchronous processing
+      try {
+        const { queueAgentMessage } = await import('./queue');
         
-        // Determine appropriate agent based on message content and project state
-        // Default to orchestrator for new projects or general queries
-        const messageLC = message.toLowerCase();
+        // This will process the message asynchronously in the background
+        await queueAgentMessage({
+          message,
+          agentId: null, // This is a user message
+          projectId,
+          targetAgentId: agentId // If specified, target that agent
+        });
         
-        // Check which phase of development the message seems to be about
-        if (messageLC.includes('bug') || messageLC.includes('error') || messageLC.includes('fix') || 
-            messageLC.includes('issue') || messageLC.includes('debug')) {
-          // Debugging related - assign to debugger (qa role)
-          const debuggerAgent = agents.find(a => a.role === 'qa');
-          if (debuggerAgent) respondingAgentId = debuggerAgent.id;
-        } else if (messageLC.includes('test') || messageLC.includes('verify') || 
-                   messageLC.includes('validation') || messageLC.includes('check if')) {
-          // Testing/verification related - assign to verifier (tester role)
-          const verifier = agents.find(a => a.role === 'tester');
-          if (verifier) respondingAgentId = verifier.id;
-        } else if (messageLC.includes('design') || messageLC.includes('ui') || 
-                   messageLC.includes('ux') || messageLC.includes('user experience') || 
-                   messageLC.includes('interface') || messageLC.includes('layout')) {
-          // UX/UI related - assign to builder since we don't have a specific designer
-          const designer = agents.find(a => a.role === 'developer');
-          if (designer) respondingAgentId = designer.id;
-        } else if (messageLC.includes('implement') || messageLC.includes('code') || 
-                  messageLC.includes('build') || messageLC.includes('develop') || 
-                  messageLC.includes('create feature')) {
-          // Implementation related - assign to builder (developer role)
-          const builder = agents.find(a => a.role === 'developer');
-          if (builder) respondingAgentId = builder.id;
-        } else {
-          // Default to orchestrator for planning and general queries
-          const orchestrator = agents.find(a => a.role === 'coordinator');
-          if (orchestrator) respondingAgentId = orchestrator.id;
-          
-          // If orchestrator not found, just take the first agent
-          if (!orchestrator && agents.length > 0) {
-            respondingAgentId = agents[0].id;
-          }
-        }
+        console.log(`Message queued for asynchronous processing in project ${projectId}`);
+      } catch (queueError) {
+        console.error('Error queueing message for processing:', queueError);
+        // Non-blocking error - we still want to return the user's response
       }
       
-      // Now, have the agent respond
-      if (respondingAgentId) {
-        try {
-          const agent = await storage.getAgent(respondingAgentId);
-          
-          // In project view (when no specific agentId is targeted), only Orchestrator (coordinator) should respond to messages
-          // If it's a direct agent message (has agentId) then any agent can respond
-          if (agent && (agentId === null && agent.role !== 'coordinator')) {
-            console.log(`Agent #${agent.id} has role ${agent.role} but only coordinator can respond in project view. Skipping.`);
-          } else if (agent) {
-            console.log(`Agent #${agent.id} (${agent.role}) responding to message in project #${projectId}`);
-            
-            // Get project tasks for context
-            const projectTasks = await storage.getTasksByProject(projectId);
-            
-            // Get all agents for accurate name/role mapping in conversation history
-            const allAgents = await storage.getAgents();
-            
-            // Get the recent conversation logs for context (up to 10 most recent)
-            const recentConversations = await storage.getConversationLogs(projectId);
-            
-            // Format the conversation history
-            const conversationHistory = recentConversations
-              .filter(log => log.type === 'conversation')
-              .slice(-10) // Get the 10 most recent logs
-              .map((log, index) => {
-                // Get the agent's name and role if this is an agent message
-                let role = 'User';
-                if (log.agentId) {
-                  const agentDetails = allAgents.find((a: any) => a.id === log.agentId);
-                  role = agentDetails 
-                    ? `Agent ${agentDetails.name} (${agentDetails.role})`
-                    : `Agent #${log.agentId}`;
-                }
-                // Format the message with a timestamp and sequence number
-                const timestamp = typeof log.timestamp === 'string' || typeof log.timestamp === 'number' || log.timestamp instanceof Date
-                  ? new Date(log.timestamp).toLocaleTimeString() 
-                  : new Date().toLocaleTimeString();
-                return `[${index + 1}] ${timestamp} - ${role}:\n${log.message}`;
-              })
-              .join('\n\n');
-            
-            // Check if the message is asking to create tasks or features
-            const createTasksRequestRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?|plan\s+tasks?|break\s+down|divide\s+into\s+tasks?|what\s+tasks|identify\s+tasks?|create\s+features?|add\s+features?|make\s+features?|start\s+features?|plan\s+features?|what\s+features|identify\s+features?/i;
-            const isRequestingTasks = createTasksRequestRegex.test(message.toLowerCase());
-            
-            // Generate an agent response based on the message
-            const response = await getAgentResponse(agent, message, {
-              project,
-              allProjects: await storage.getProjects(),
-              relatedTasks: projectTasks,
-              conversationHistory,
-              recentLogs: await storage.getLogsByProject(projectId)
-            });
-            
-            // Create a conversation log from the agent
-            const agentResponseLog = await storage.createLog({
-              agentId: agent.id,
-              projectId,
-              type: 'conversation',
-              message: response,
-              details: null
-            });
-            
-            // Broadcast the new log
-            broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
-            
-            // Check if the response appears to contain tasks or features
-            const responseContainsTasks = /task\s+\d+|tasks?:|\btask\b.*?:|here are the tasks|list of tasks|following tasks|we'll need to|steps to implement|break this down into|implementation steps|features?:|\bfeature\b.*?:|here are the features|list of features|following features/i.test(response);
-            
-            // We'll extract tasks if:
-            // 1. User explicitly asked for tasks creation, or
-            // 2. The agent's response appears to contain task descriptions
-            // Now allowing all agent types to create tasks/features
-            const shouldExtractTasks = isRequestingTasks || responseContainsTasks;
-            
-            console.log(`Task extraction check: requestingTasks=${isRequestingTasks}, responseTasks=${responseContainsTasks}, shouldExtract=${shouldExtractTasks}`);
-            
-            // If the message or response contains task descriptions, extract them
-            if (shouldExtractTasks) {
-              try {
-                // Extract task information from the agent's response
-                const taskExtraction = await extractTasksFromResponse(response, projectId);
-                
-                // Create the tasks
-                for (const taskInfo of taskExtraction) {
-                  const task = await storage.createTask({
-                    ...taskInfo,
-                    projectId
-                  });
-                  
-                  // Create a log about task creation
-                  await storage.createLog({
-                    agentId: agent.id,
-                    projectId,
-                    type: 'info',
-                    message: `Created task: ${task.title}`,
-                    details: task.description
-                  });
-                  
-                  // Broadcast task creation
-                  broadcastMessage(wss, { type: 'task_created', task });
-                }
-                
-                console.log(`Created ${taskExtraction.length} tasks for project ${projectId}`);
-              } catch (error) {
-                console.error('Error extracting tasks from response:', error);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error creating agent response:', error);
-          // Non-blocking error - we still want to return the user's response
-        }
-      }
-      
+      // Return immediately with the user's message log
+      // The agent response will come through the websocket when it's ready
       res.status(201).json(responseLog);
     } catch (err) {
       console.error('Error responding to conversation:', err);
