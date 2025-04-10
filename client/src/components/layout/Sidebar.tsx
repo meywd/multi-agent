@@ -53,7 +53,50 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         </svg>
       ),
       href: "/projects",
-      isActive: location === "/projects"
+      isActive: location === "/projects" || location.startsWith("/projects/")
+    },
+    {
+      name: "Features",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5"
+        >
+          <path d="M16.5 9.4 7.5 4.21" />
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <path d="M3.27 6.96 12 12.01l8.73-5.05" />
+          <path d="M12 22.08V12" />
+        </svg>
+      ),
+      href: "/features",
+      isActive: location === "/features" || location.startsWith("/features/")
+    },
+    {
+      name: "Tasks",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5"
+        >
+          <path d="M12 2H2v10h10V2z" />
+          <path d="M7 7h10v10H7V7z" />
+          <path d="M12 12h10v10H12V12z" />
+        </svg>
+      ),
+      href: "/tasks",
+      isActive: location === "/tasks" || location.startsWith("/tasks/")
     },
     {
       name: "Agents",
@@ -74,27 +117,6 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       ),
       href: "/agents",
       isActive: location === "/agents"
-    },
-    {
-      name: "Tasks",
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-5 w-5"
-        >
-          <path d="M8 6h10" />
-          <path d="M6 12h9" />
-          <path d="M11 18h7" />
-        </svg>
-      ),
-      href: "/tasks",
-      isActive: location === "/tasks"
     },
     {
       name: "Analytics",
