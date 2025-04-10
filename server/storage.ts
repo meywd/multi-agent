@@ -729,21 +729,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const now = new Date();
-    const userData = {
-      ...insertUser,
-      createdAt: now,
-      role: 'user',
-      githubUsername: null,
-      githubToken: null,
-      lastLogin: null
-    };
-    
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .returning();
-    return user;
+    try {
+      console.log("Creating user in DatabaseStorage:", insertUser);
+      const now = new Date();
+      
+      // Make sure email and fullName are properly set to null if undefined
+      const userData = {
+        username: insertUser.username,
+        password: insertUser.password,
+        email: insertUser.email || null,
+        fullName: insertUser.fullName || null,
+        createdAt: now,
+        role: 'user',
+        githubUsername: null,
+        githubToken: null,
+        lastLogin: null
+      };
+      
+      console.log("Processed user data:", {
+        ...userData,
+        password: "***REDACTED***"
+      });
+      
+      const [user] = await db
+        .insert(users)
+        .values(userData)
+        .returning();
+      
+      console.log("User created successfully:", user.id);
+      return user;
+    } catch (error) {
+      console.error("Error creating user in DatabaseStorage:", error);
+      throw error;
+    }
   }
   
   async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {

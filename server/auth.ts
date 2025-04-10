@@ -86,33 +86,53 @@ export function setupAuth(app: Express) {
   // Registration endpoint
   app.post("/api/register", async (req, res, next) => {
     try {
+      console.log("Registration request received:", JSON.stringify(req.body, null, 2));
       const { username, password, email, fullName } = req.body;
       
+      if (!username || !password) {
+        console.log("Missing required fields: username or password");
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      
+      console.log("Checking if username exists:", username);
       // Check if user already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
+        console.log("Username already exists");
         return res.status(400).json({ message: "Username already exists" });
       }
       
       // Check if email is already in use
       if (email) {
+        console.log("Checking if email exists:", email);
         const existingEmail = await storage.getUserByEmail(email);
         if (existingEmail) {
+          console.log("Email already in use");
           return res.status(400).json({ message: "Email already in use" });
         }
       }
       
       // Create the user
+      console.log("Creating user with:", { username, email, fullName });
+      const hashedPassword = await hashPassword(password);
+      console.log("Password hashed successfully");
+      
       const user = await storage.createUser({
         username,
-        password: await hashPassword(password),
-        email,
-        fullName
+        password: hashedPassword,
+        email: email || null,
+        fullName: fullName || null
       });
+      
+      console.log("User created successfully:", user.id);
 
       // Log the user in
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error("Error logging in user after registration:", err);
+          return next(err);
+        }
+        console.log("User logged in successfully");
         return res.status(201).json({
           id: user.id,
           username: user.username,
@@ -128,16 +148,28 @@ export function setupAuth(app: Express) {
 
   // Login endpoint
   app.post("/api/login", (req, res, next) => {
+    console.log("Login request received:", JSON.stringify(req.body, null, 2));
+    
     passport.authenticate("local", (err, user, info) => {
-      if (err) return next(err);
+      if (err) {
+        console.error("Login authentication error:", err);
+        return next(err);
+      }
       
       if (!user) {
+        console.log("Authentication failed, no user found:", info?.message || "Authentication failed");
         return res.status(401).json({ message: info?.message || "Authentication failed" });
       }
       
+      console.log("User authenticated, attempting login:", user.id);
+      
       req.login(user, (loginErr) => {
-        if (loginErr) return next(loginErr);
+        if (loginErr) {
+          console.error("Error during login session creation:", loginErr);
+          return next(loginErr);
+        }
         
+        console.log("Login successful for user:", user.id);
         return res.json({
           id: user.id,
           username: user.username,
@@ -158,11 +190,17 @@ export function setupAuth(app: Express) {
 
   // Current user endpoint
   app.get("/api/user", (req, res) => {
+    console.log("GET /api/user called, isAuthenticated:", req.isAuthenticated());
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
     
     const user = req.user;
+    console.log("Returning user data:", {
+      id: user.id,
+      username: user.username
+    });
+    
     res.json({
       id: user.id,
       username: user.username,
