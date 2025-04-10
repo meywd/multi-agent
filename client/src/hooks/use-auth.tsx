@@ -44,8 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation<User, Error, LoginData>({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
+      return await apiRequest({
+        method: "POST", 
+        url: "/api/login", 
+        body: credentials
+      });
     },
     onSuccess: (user: User) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -55,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -65,8 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation<User, Error, RegisterData>({
     mutationFn: async (userData: RegisterData) => {
-      const res = await apiRequest("POST", "/api/register", userData);
-      return await res.json();
+      return await apiRequest({
+        method: "POST", 
+        url: "/api/register", 
+        body: userData
+      });
     },
     onSuccess: (user: User) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -76,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("Registration error:", error);
       toast({
         title: "Registration failed",
         description: error.message,
@@ -86,7 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      await apiRequest({
+        method: "POST", 
+        url: "/api/logout" 
+      });
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
@@ -97,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("Logout error:", error);
       toast({
         title: "Logout failed",
         description: error.message,
