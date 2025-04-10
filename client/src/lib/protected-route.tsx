@@ -22,6 +22,13 @@ export function ProtectedRoute({ path, component: Component }: ProtectedRoutePro
 
   if (!user) {
     console.log(`ProtectedRoute (${path}): Not authenticated, redirecting to /auth`);
+    // We use window.location.href here to force a page refresh, which will
+    // reset all the React state and fetch data fresh from the server
+    if (typeof window !== 'undefined') {
+      window.location.href = '/auth';
+      return null;
+    }
+    
     return (
       <Route path={path}>
         <Redirect to="/auth" />

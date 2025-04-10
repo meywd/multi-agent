@@ -71,9 +71,8 @@ export default function AuthPage() {
           title: "Login successful",
           description: "Welcome back!",
         });
-        setTimeout(() => {
-          setLocation("/");
-        }, 100);
+        // Use window.location for more reliable redirection
+        window.location.href = "/";
       },
       onError: (error) => {
         console.error("Login submission error:", error);
@@ -95,9 +94,8 @@ export default function AuthPage() {
           title: "Registration successful",
           description: "Your account has been created.",
         });
-        setTimeout(() => {
-          setLocation("/");
-        }, 100);
+        // Use window.location for more reliable redirection
+        window.location.href = "/";
       },
       onError: (error) => {
         console.error("Registration submission error:", error);
@@ -110,11 +108,14 @@ export default function AuthPage() {
     });
   };
   
-  // Redirect to home if already logged in
-  if (user) {
-    setLocation("/");
-    return null;
-  }
+  // Redirect to home if already logged in using useEffect
+  React.useEffect(() => {
+    if (user) {
+      console.log("Auth page: User already logged in, redirecting to /");
+      // Use window.location for more reliable redirection
+      window.location.href = "/";
+    }
+  }, [user]);
   
   return (
     <div className="container flex h-screen w-screen flex-col items-center justify-center">
