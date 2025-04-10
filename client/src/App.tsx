@@ -2,6 +2,7 @@ import { Route, Switch, useLocation } from "wouter";
 import Dashboard from "@/pages/dashboard";
 import ProjectsPage from "@/pages/projects";
 import ProjectDetailPage from "@/pages/project-detail";
+import FeaturesPage from "@/pages/features";
 import FeatureDetailPage from "@/pages/feature-detail";
 import TaskDetailPage from "@/pages/task-detail";
 import PlaygroundPage from "@/pages/playground";
@@ -55,6 +56,7 @@ function AppRoutes() {
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/projects" component={ProjectsPage} />
         <ProtectedRoute path="/projects/:id" component={ProjectDetailPage} />
+        <ProtectedRoute path="/features" component={FeaturesPage} />
         <ProtectedRoute path="/features/:id" component={FeatureDetailPage} />
         <ProtectedRoute path="/tasks/:id" component={TaskDetailPage} />
         <ProtectedRoute path="/agents" component={AgentsPage} />
