@@ -895,16 +895,19 @@ export class DatabaseStorage implements IStorage {
   // Feature and Subtask methods
   async getFeatures(projectId?: number): Promise<Task[]> {
     try {
-      let query = db
-        .select()
-        .from(tasks)
-        .where(eq(tasks.isFeature, true));
+      let conditions = [];
+      conditions.push(eq(tasks.isFeature, true));
       
       if (projectId !== undefined) {
-        query = query.where(eq(tasks.projectId, projectId));
+        conditions.push(eq(tasks.projectId, projectId));
       }
       
-      return await query;
+      const result = await db
+        .select()
+        .from(tasks)
+        .where(and(...conditions));
+        
+      return result;
     } catch (error) {
       console.error('Error getting features:', error);
       return [];
