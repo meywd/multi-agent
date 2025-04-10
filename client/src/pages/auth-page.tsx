@@ -63,26 +63,50 @@ export default function AuthPage() {
   
   // Submit handlers
   const onLoginSubmit = (values: z.infer<typeof loginSchema>) => {
+    console.log("Submitting login with:", values);
     loginMutation.mutate(values, {
-      onSuccess: () => {
+      onSuccess: (userData) => {
+        console.log("Login success, user data:", userData);
         toast({
           title: "Login successful",
           description: "Welcome back!",
         });
-        setLocation("/");
+        setTimeout(() => {
+          setLocation("/");
+        }, 100);
       },
+      onError: (error) => {
+        console.error("Login submission error:", error);
+        toast({
+          title: "Login failed",
+          description: error.message || "An error occurred during login",
+          variant: "destructive",
+        });
+      }
     });
   };
   
   const onRegisterSubmit = (values: z.infer<typeof registerSchema>) => {
+    console.log("Submitting registration with:", values);
     registerMutation.mutate(values, {
-      onSuccess: () => {
+      onSuccess: (userData) => {
+        console.log("Registration success, user data:", userData);
         toast({
           title: "Registration successful",
           description: "Your account has been created.",
         });
-        setLocation("/");
+        setTimeout(() => {
+          setLocation("/");
+        }, 100);
       },
+      onError: (error) => {
+        console.error("Registration submission error:", error);
+        toast({
+          title: "Registration failed",
+          description: error.message || "An error occurred during registration",
+          variant: "destructive",
+        });
+      }
     });
   };
   

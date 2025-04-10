@@ -21,12 +21,16 @@ export function ProtectedRoute({ path, component: Component }: ProtectedRoutePro
   }
 
   if (!user) {
+    console.log(`ProtectedRoute (${path}): Not authenticated, redirecting to /auth`);
     return (
       <Route path={path}>
         <Redirect to="/auth" />
       </Route>
     );
   }
+  
+  console.log(`ProtectedRoute (${path}): User authenticated, rendering component`);
+  
 
   return (
     <Route path={path}>
