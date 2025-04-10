@@ -45,8 +45,8 @@ export default function FeaturesPage() {
   const projects = Array.from(
     new Set(
       features
-        .filter(feature => feature.projectId !== null)
-        .map(feature => feature.projectId)
+        .filter(feature => feature.projectId !== null && feature.projectId !== undefined)
+        .map(feature => feature.projectId as number)
     )
   );
 
@@ -168,7 +168,7 @@ export default function FeaturesPage() {
             <SelectContent>
               <SelectItem value="all">All Projects</SelectItem>
               {projects.map((projectId) => (
-                <SelectItem key={projectId} value={projectId!.toString()}>
+                <SelectItem key={projectId} value={projectId.toString()}>
                   {getProjectName(projectId)}
                 </SelectItem>
               ))}
@@ -252,7 +252,7 @@ export default function FeaturesPage() {
                     </CardTitle>
                     <CardDescription className="mt-1">
                       <span className="text-xs font-medium">
-                        {getProjectName(feature.projectId)}
+                        {getProjectName(feature.projectId || null)}
                       </span>
                     </CardDescription>
                   </div>
