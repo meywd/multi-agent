@@ -71,8 +71,11 @@ export default function AuthPage() {
           title: "Login successful",
           description: "Welcome back!",
         });
-        // Use window.location for more reliable redirection
-        window.location.href = "/";
+        // Force hard redirect to root with location replacement
+        console.log("LOGIN SUCCESS - REDIRECTING TO ROOT");
+        setTimeout(() => {
+          window.location.replace("/");
+        }, 500);
       },
       onError: (error) => {
         console.error("Login submission error:", error);
@@ -94,8 +97,11 @@ export default function AuthPage() {
           title: "Registration successful",
           description: "Your account has been created.",
         });
-        // Use window.location for more reliable redirection
-        window.location.href = "/";
+        // Force hard redirect to root with location replacement
+        console.log("REGISTRATION SUCCESS - REDIRECTING TO ROOT");
+        setTimeout(() => {
+          window.location.replace("/");
+        }, 500);
       },
       onError: (error) => {
         console.error("Registration submission error:", error);
@@ -112,8 +118,8 @@ export default function AuthPage() {
   React.useEffect(() => {
     if (user) {
       console.log("Auth page: User already logged in, redirecting to /");
-      // Use window.location for more reliable redirection
-      window.location.href = "/";
+      // Force hard redirect to root with location replacement
+      window.location.replace("/");
     }
   }, [user]);
   
