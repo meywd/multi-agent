@@ -1,7 +1,18 @@
 import { apiRequest } from "./queryClient";
+import { sendWebSocketMessage } from "./websocket";
+
+// Store for tracking pending agent queries
+export const pendingAgentQueries: {
+  [jobId: string]: {
+    agentId: number;
+    resolve: (value: string) => void;
+    reject: (error: Error) => void;
+    timeout: NodeJS.Timeout;
+  }
+} = {};
 
 /**
- * Send a query to a specific agent and get a response
+ * Send a query to a specific agent with asynchronous WebSocket response
  */
 export async function queryAgent({ 
   agentId, 
@@ -12,13 +23,44 @@ export async function queryAgent({
   prompt: string; 
   includeContext?: boolean; 
 }): Promise<string> {
-  const response = await apiRequest({
-    method: "POST", 
-    url: `/api/agents/${agentId}/query`, 
-    body: { prompt, includeContext }
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Make the initial API request
+      const response = await apiRequest({
+        method: "POST", 
+        url: `/api/agents/${agentId}/query`, 
+        body: { prompt, includeContext }
+      });
+      
+      // If response contains a status of "processing" and a jobId, 
+      // register this query to receive WebSocket updates
+      if (response.status === "processing" && response.jobId) {
+        // Store the callbacks to resolve/reject this promise when the WebSocket message arrives
+        pendingAgentQueries[response.jobId] = {
+          agentId,
+          resolve,
+          reject,
+          // Set a timeout to reject the promise if no WebSocket response is received
+          timeout: setTimeout(() => {
+            if (pendingAgentQueries[response.jobId]) {
+              pendingAgentQueries[response.jobId].reject(
+                new Error("Query timed out waiting for response")
+              );
+              delete pendingAgentQueries[response.jobId];
+            }
+          }, 60000) // 60 second timeout
+        };
+        
+        // Return the placeholder response immediately for UI feedback
+        return response.response;
+      } else {
+        // If the API response is complete (not async), resolve immediately
+        resolve(response.response);
+      }
+    } catch (error) {
+      reject(error);
+    }
   });
-  
-  return response.response;
 }
 
 /**

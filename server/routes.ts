@@ -827,38 +827,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Agent not found' });
       }
       
-      // Gather context if requested
-      let context = {};
-      if (includeContext) {
-        const [recentLogs, relatedTasks, relatedIssues, projects] = await Promise.all([
-          storage.getLogsByAgent(agentId),
-          storage.getTasksByAgent(agentId),
-          storage.getIssues(), // Filter relevant issues in the frontend
-          storage.getProjects() // Include all projects
-        ]);
-        
-        context = {
-          recentLogs: recentLogs.slice(0, 10), // Last 10 logs
-          relatedTasks,
-          relatedIssues,
-          allProjects: projects // Add all projects to context
-        };
-      }
+      // Generate a unique job ID for this query
+      const jobId = `agent-query-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       
-      const response = await getAgentResponse(agent, prompt, context);
-      
-      // Log this interaction
-      const log = await storage.createLog({
-        agentId,
-        type: 'info',
-        message: `Processed query: ${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}`,
-        details: `Query: ${prompt}\n\nResponse: ${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`
+      // Send an immediate response that the job is queued
+      res.json({ 
+        status: 'processing',
+        jobId,
+        message: 'Your query is being processed asynchronously',
+        // Provide a placeholder response for immediate feedback
+        response: 'Processing your request. You will receive the full response via WebSocket shortly.'
       });
       
-      // Broadcast new log to all clients
-      broadcastMessage(wss, { type: 'log_created', log });
-      
-      res.json({ response });
+      // Process the request asynchronously
+      (async () => {
+        try {
+          // Gather context if requested
+          let context = {};
+          if (includeContext) {
+            const [recentLogs, relatedTasks, relatedIssues, projects] = await Promise.all([
+              storage.getLogsByAgent(agentId),
+              storage.getTasksByAgent(agentId),
+              storage.getIssues(), // Filter relevant issues in the frontend
+              storage.getProjects() // Include all projects
+            ]);
+            
+            context = {
+              recentLogs: recentLogs.slice(0, 10), // Last 10 logs
+              relatedTasks,
+              relatedIssues,
+              allProjects: projects // Add all projects to context
+            };
+          }
+          
+          // Send a "processing" message via WebSocket
+          broadcastMessage(wss, { 
+            type: 'agent_query_processing', 
+            agentId,
+            jobId,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Get the agent response
+          const response = await getAgentResponse(agent, prompt, context);
+          
+          // Log this interaction
+          const log = await storage.createLog({
+            agentId,
+            type: 'info',
+            message: `Processed query: ${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}`,
+            details: `Query: ${prompt}\n\nResponse: ${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`
+          });
+          
+          // Broadcast new log to all clients
+          broadcastMessage(wss, { 
+            type: 'log_created', 
+            log 
+          });
+          
+          // Send the completed response via WebSocket
+          broadcastMessage(wss, { 
+            type: 'agent_query_completed', 
+            agentId,
+            jobId,
+            response,
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error('Error in async agent query processing:', error);
+          // Send error via WebSocket
+          broadcastMessage(wss, { 
+            type: 'agent_query_error', 
+            agentId,
+            jobId,
+            error: 'An error occurred while processing your request',
+            timestamp: new Date().toISOString()
+          });
+        }
+      })();
     } catch (err) {
       console.error('Error processing agent query:', err);
       res.status(500).json({ message: 'Error processing agent query' });
