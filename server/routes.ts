@@ -9,6 +9,7 @@ import { getAgentResponse, analyzeCode, generateCode, verifyImplementation } fro
 import OpenAI from "openai";
 import { eq } from "drizzle-orm";
 import { setupAuth } from "./auth";
+import { queueAgentMessage, queueTaskProcessing } from "./queue";
 
 // Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
