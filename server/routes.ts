@@ -1462,6 +1462,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         console.log(`Processing message in project ${projectId}`);
         
+        // Generate a unique job ID for tracking this conversation
+        const jobId = `project-convo-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        
         let responseMessage = `I've received your message: "${message}".`;
         
         // Add context of the referenced message if available
@@ -1484,16 +1487,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Broadcast the new agent response log
         broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
         
-        // Queue the main message processing to happen asynchronously
-        // This will allow the agent to continue working after sending its initial response
-        await queueAgentMessage({
+        // Send a processing status message via WebSocket
+        broadcastMessage(wss, { 
+          type: 'agent_query_processing', 
+          agentId: agentId || 1,
+          jobId,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Queue the main message processing to happen asynchronously without awaiting its completion
+        // This will allow the response to return immediately to the client
+        queueAgentMessage({
           message: message,
           agentId: null, // From user
           projectId: projectId,
-          targetAgentId: agentId || null
+          targetAgentId: agentId || null,
+          jobId: jobId
+        }).catch(err => {
+          console.error('Error queueing message:', err);
         });
         
-        console.log(`Message queued for full processing by agent #${agentId || 1}`);
+        console.log(`Message queued for full processing by agent #${agentId || 1} with jobId: ${jobId}`);
         
       } catch (responseError) {
         console.error('Error creating agent response:', responseError);

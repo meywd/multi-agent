@@ -25,13 +25,23 @@ export function setWebSocketServer(webSocketServer: WebSocketServer) {
 
 // Broadcast a message to all connected WebSocket clients
 function broadcastMessage(message: any) {
-  if (!wss) return;
+  if (!wss) {
+    console.log('WebSocket server not initialized, cannot broadcast message');
+    return;
+  }
   
+  let clientCount = 0;
   wss.clients.forEach((client: any) => {
-    if (client.readyState === 1) { // WebSocket.OPEN
+    // Import WebSocket to get proper constants
+    const WebSocket = require('ws');
+    
+    if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify(message));
+      clientCount++;
     }
   });
+  
+  console.log(`Broadcasted message of type ${message.type} to ${clientCount} clients`);
 }
 
 // Add a message to the queue for processing
@@ -39,16 +49,18 @@ export async function queueAgentMessage({
   message,
   agentId,
   projectId,
-  targetAgentId
+  targetAgentId,
+  jobId
 }: {
   message: string;
   agentId: number | null;
   projectId: number;
   targetAgentId?: number | null;
+  jobId?: string;
 }) {
   return messageQueue.add(
     'process-message',
-    { message, agentId, projectId, targetAgentId },
+    { message, agentId, projectId, targetAgentId, jobId },
     { 
       attempts: 3,
       backoff: {
@@ -82,10 +94,20 @@ export async function queueTaskProcessing({
 
 // Process agent messages
 messageQueue.process('process-message', async (job) => {
-  const { message, agentId, projectId, targetAgentId } = job.data;
-  console.log(`Processing message in queue: ${message.substring(0, 50)}...`);
+  const { message, agentId, projectId, targetAgentId, jobId } = job.data;
+  console.log(`Processing message in queue: ${message.substring(0, 50)}... (job: ${jobId || 'no-id'})`);
   
   try {
+    // Notify clients that processing is starting (if jobId is provided)
+    if (jobId) {
+      broadcastMessage({ 
+        type: 'agent_query_processing', 
+        status: 'started',
+        jobId,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     // Validate project exists
     const project = await storage.getProject(projectId);
     if (!project) {
@@ -397,10 +419,31 @@ taskQueue.process('process-task', async (job) => {
 // Listen for queue events
 messageQueue.on('completed', (job, result) => {
   console.log(`Message job ${job.id} completed with result:`, result.success);
+  
+  // If this job had a jobId, notify clients that processing is complete
+  if (job.data && job.data.jobId) {
+    broadcastMessage({ 
+      type: 'agent_query_processing', 
+      status: 'completed',
+      jobId: job.data.jobId,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 messageQueue.on('failed', (job, err) => {
   console.error(`Message job ${job.id} failed with error:`, err);
+  
+  // If this job had a jobId, notify clients that processing failed
+  if (job.data && job.data.jobId) {
+    broadcastMessage({ 
+      type: 'agent_query_processing', 
+      status: 'failed',
+      jobId: job.data.jobId,
+      error: err.message || 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 taskQueue.on('completed', (job, result) => {
