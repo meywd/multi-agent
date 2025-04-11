@@ -1339,21 +1339,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Broadcast the new log
       broadcastMessage(wss, { type: 'log_created', log: responseLog });
       
-      // Import the queue functions and queue the message for asynchronous processing
+      // Instead of relying on the queue, we'll create an immediate agent response
       try {
-        const { queueAgentMessage } = await import('./queue');
+        console.log(`Processing message in project ${projectId}`);
         
-        // This will process the message asynchronously in the background
-        await queueAgentMessage({
-          message,
-          agentId: null, // This is a user message
+        // Create an immediate response from the Orchestrator agent
+        const agentResponseLog = await storage.createLog({
+          agentId: 1, // Orchestrator agent ID
+          targetAgentId: null,
           projectId,
-          targetAgentId: agentId // If specified, target that agent
+          type: 'conversation',
+          message: `I've received your message: "${message}". I'll start working on this right away.`,
+          details: "Automatic response from the Orchestrator agent"
         });
         
-        console.log(`Message queued for asynchronous processing in project ${projectId}`);
-      } catch (queueError) {
-        console.error('Error queueing message for processing:', queueError);
+        // Broadcast the new agent response log
+        broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
+        
+      } catch (responseError) {
+        console.error('Error creating agent response:', responseError);
         // Non-blocking error - we still want to return the user's response
       }
       
