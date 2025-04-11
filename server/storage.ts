@@ -58,6 +58,7 @@ export interface IStorage {
   getLogsByProject(projectId: number): Promise<Log[]>;
   getConversationLogs(projectId?: number): Promise<Log[]>;
   createLog(log: InsertLog): Promise<Log>;
+  clearConversationLogs(projectId: number): Promise<boolean>;
   
   // Issue methods
   getIssues(): Promise<Issue[]>;
@@ -500,6 +501,20 @@ export class MemStorage implements IStorage {
     };
     this.logs.set(id, log);
     return log;
+  }
+  
+  async clearConversationLogs(projectId: number): Promise<boolean> {
+    // Get all log IDs for conversation logs in this project
+    const logIdsToRemove = Array.from(this.logs.values())
+      .filter(log => log.projectId === projectId && log.type === 'conversation')
+      .map(log => log.id);
+    
+    // Remove all identified logs
+    for (const logId of logIdsToRemove) {
+      this.logs.delete(logId);
+    }
+    
+    return true;
   }
 
   // Issue methods
