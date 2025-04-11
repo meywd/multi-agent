@@ -27,12 +27,14 @@ import {
   ArrowRight,
   ArrowUp,
   Clock, 
-  Calendar, 
+  Calendar,
+  Loader2,
   MessageSquare, 
   User, 
   Send, 
   Reply,
   ChevronRight,
+  Trash2,
   ChevronDown,
   Layers,
   Github,
@@ -760,6 +762,15 @@ export default function ProjectDetailPage() {
             <div className="space-y-4">
               {[...conversations].reverse().map((log) => (
                 <Card key={log.id} className={`overflow-hidden border-l-4 ${log.agentId ? 'border-l-primary' : 'border-l-slate-400'}`}>
+                  {/* Show agent typing animation when waiting for reply */}
+                  {waitingForReply && log === conversations[conversations.length - 1] && log.agentId === null && (
+                    <div className="absolute top-0 left-0 right-0 p-2 bg-primary/10 text-xs text-center animate-pulse">
+                      <div className="flex items-center justify-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Agent is thinking...</span>
+                      </div>
+                    </div>
+                  )}
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 mt-0.5">
