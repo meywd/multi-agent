@@ -237,6 +237,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   setupAuth(app);
   
+  // Import analytics functions
+  const { getUsageAnalytics } = await import('./analytics');
+  
   const httpServer = createServer(app);
   
   // Setup WebSocket server
@@ -1413,6 +1416,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error('Error responding to conversation:', err);
       res.status(500).json({ message: 'Error responding to conversation' });
+    }
+  });
+
+  // Analytics routes
+  app.get('/api/analytics/usage', async (req, res) => {
+    try {
+      // Only authenticated users can access analytics
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+      
+      // Get the time range from query parameters or default to 30d
+      const timeRange = req.query.timeRange as string || '30d';
+      
+      // Get usage analytics data
+      const usageData = await getUsageAnalytics(timeRange);
+      
+      res.json(usageData);
+    } catch (error) {
+      console.error('Error fetching usage analytics:', error);
+      res.status(500).json({ 
+        message: 'Failed to fetch usage analytics', 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
     }
   });
 

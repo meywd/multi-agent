@@ -11,6 +11,7 @@ import TasksPage from "@/pages/tasks";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import YouTubeFeatures from "@/pages/youtube-features";
+import Analytics from "@/pages/analytics";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { useState } from "react";
