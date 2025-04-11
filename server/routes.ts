@@ -668,17 +668,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/projects/:projectId/conversations/clear', async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     try {
-      // In a real application, this would delete the logs from the database
-      // For now, we'll create a special log entry that marks a conversation clear
-      await storage.createLog({
-        projectId: projectId,
-        message: "Conversation history cleared by user",
-        timestamp: new Date(),
-        type: "system",
-        isSystemMessage: true
-      });
+      // Actually delete all conversation logs for this project
+      const success = await storage.clearConversationLogs(projectId);
       
-      res.json({ success: true, message: "Conversations cleared successfully" });
+      if (success) {
+        // Add a single system message indicating the history was cleared
+        await storage.createLog({
+          projectId: projectId,
+          message: "Conversation history cleared by user",
+          type: "system"
+        });
+        
+        res.json({ success: true, message: "Conversations cleared successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to clear conversations" });
+      }
     } catch (error) {
       console.error("Error clearing project conversations:", error);
       res.status(500).json({ message: "Failed to clear project conversations" });

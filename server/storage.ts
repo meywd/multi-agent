@@ -1032,6 +1032,21 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async clearConversationLogs(projectId: number): Promise<boolean> {
+    try {
+      await db
+        .delete(logs)
+        .where(and(
+          eq(logs.projectId, projectId),
+          eq(logs.type, 'conversation')
+        ));
+      return true;
+    } catch (error) {
+      console.error('Error clearing conversation logs:', error);
+      return false;
+    }
+  }
+
   async createLog(insertLog: InsertLog): Promise<Log> {
     const now = new Date();
     const [log] = await db
