@@ -300,12 +300,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Helper function to broadcast messages to all connected clients
   function broadcastMessage(wss: WebSocketServer, message: any) {
+    if (!wss) {
+      console.log('WebSocket server not initialized, cannot broadcast message');
+      return;
+    }
+    
+    let clientCount = 0;
     const messageStr = JSON.stringify(message);
+    
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(messageStr);
+        clientCount++;
       }
     });
+    
+    console.log(`Broadcasted message of type ${message.type} to ${clientCount} clients`);
   }
   
   // Helper function to send initial data to a client
