@@ -6,7 +6,8 @@ import {
   getProjectConversations, 
   respondToConversation,
   getFeatures,
-  getSubtasks
+  getSubtasks,
+  getAgents
 } from "@/lib/agentService";
 import { 
   Card, 
@@ -19,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Project, Task, Log } from "@/lib/types";
+import { Project, Task, Log, Agent } from "@/lib/types";
 import { Link } from "wouter";
 import { 
   ArrowLeft, 
@@ -712,7 +713,7 @@ export default function ProjectDetailPage() {
                           <div className="font-medium text-sm flex items-center gap-2">
                             {log.agentId ? (
                               <>
-                                <span className="text-primary">Agent #{log.agentId}</span>
+                                <span className="text-primary">{getAgentName(log.agentId)}</span>
                                 {log.type && (
                                   <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 font-normal">
                                     {log.type}
@@ -724,7 +725,7 @@ export default function ProjectDetailPage() {
                             )}
                             {log.targetAgentId && <span className="text-muted-foreground flex items-center gap-1">
                               <ArrowRight className="h-3 w-3" /> 
-                              <span>Agent #{log.targetAgentId}</span>
+                              <span>{getAgentName(log.targetAgentId)}</span>
                             </span>}
                           </div>
                           <div className="text-xs text-muted-foreground">
@@ -741,7 +742,7 @@ export default function ProjectDetailPage() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => handleReply(log.targetAgentId || 1, `Agent #${log.targetAgentId}`)}
+                              onClick={() => handleReply(log.targetAgentId || 1, getAgentName(log.targetAgentId))}
                               className="text-xs h-7 gap-1"
                             >
                               <Reply className="h-3 w-3" />
