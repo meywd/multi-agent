@@ -155,6 +155,21 @@ export default function ProjectDetailPage() {
     queryFn: () => getProjectConversations(projectId),
     enabled: !!projectId && !isNaN(projectId)
   });
+  
+  // Query for all agents to map agent IDs to names
+  const {
+    data: agents = []
+  } = useQuery({
+    queryKey: ["/api/agents"],
+    queryFn: () => getAgents()
+  });
+  
+  // Function to get agent name from ID
+  const getAgentName = (agentId: number | null) => {
+    if (!agentId) return "Unknown";
+    const agent = agents.find(a => a.id === agentId);
+    return agent ? agent.name : `Agent #${agentId}`;
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
