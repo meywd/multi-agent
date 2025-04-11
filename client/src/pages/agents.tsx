@@ -24,6 +24,8 @@ import { insertAgentSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { CreateFeatureDialog } from "@/components/dialogs/CreateFeatureDialog";
+import { LinkFeatureDialog } from "@/components/dialogs/LinkFeatureDialog";
 
 const agentSchema = insertAgentSchema.extend({
   name: z.string().min(2, "Agent name must be at least 2 characters"),
@@ -358,7 +360,31 @@ export default function AgentsPage() {
                 <p className="text-xs sm:text-sm text-gray-700 line-clamp-3">
                   {agent.description || "No description provided."}
                 </p>
-                <div className="mt-3 sm:mt-4 flex justify-end">
+                <div className="mt-3 sm:mt-4 flex justify-end space-x-2">
+                  <CreateFeatureDialog 
+                    agentId={agent.id} 
+                    trigger={
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs sm:text-sm"
+                      >
+                        Create Feature
+                      </Button>
+                    }
+                  />
+                  <LinkFeatureDialog 
+                    agentId={agent.id} 
+                    trigger={
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs sm:text-sm"
+                      >
+                        Link Feature
+                      </Button>
+                    }
+                  />
                   <Button 
                     variant="outline" 
                     size="sm" 
