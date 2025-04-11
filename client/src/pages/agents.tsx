@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getAgents } from "@/lib/agentService";
 import { queryAgent } from "@/lib/aiService";
@@ -20,12 +20,14 @@ import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { insertAgentSchema } from "@shared/schema";
+import { insertAgentSchema, Task } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { CreateFeatureDialog } from "@/components/dialogs/CreateFeatureDialog";
 import { LinkFeatureDialog } from "@/components/dialogs/LinkFeatureDialog";
+import { TaskPreviewCard } from "@/components/cards/TaskPreviewCard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const agentSchema = insertAgentSchema.extend({
   name: z.string().min(2, "Agent name must be at least 2 characters"),
@@ -51,6 +53,7 @@ export default function AgentsPage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
+  const [agentFeatures, setAgentFeatures] = useState<{[key: number]: Task[]}>({});
 
   const form = useForm<z.infer<typeof agentSchema>>({
     resolver: zodResolver(agentSchema),

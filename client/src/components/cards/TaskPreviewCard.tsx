@@ -96,7 +96,7 @@ export function TaskPreviewCard({ task, onClick, className }: TaskPreviewCardPro
         )}>
           {task.priority}
         </Badge>
-        {task.progress > 0 && (
+        {task.progress !== null && task.progress > 0 && (
           <div className="flex items-center">
             <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700">
               <div 
