@@ -98,4 +98,7 @@ export type WebSocketMessage =
   | { type: 'issue_created', issue: Issue }
   | { type: 'issue_updated', issue: Issue }
   | { type: 'project_created', project: Project }
-  | { type: 'project_updated', project: Project };
+  | { type: 'project_updated', project: Project }
+  | { type: 'agent_query_processing', agentId: number, jobId: string, timestamp: string }
+  | { type: 'agent_query_completed', agentId: number, jobId: string, response: string, timestamp: string }
+  | { type: 'agent_query_error', agentId: number, jobId: string, error: string, timestamp: string };

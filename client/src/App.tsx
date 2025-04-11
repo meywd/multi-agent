@@ -14,12 +14,16 @@ import YouTubeFeatures from "@/pages/youtube-features";
 import Analytics from "@/pages/analytics";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { CookieConsentProvider } from "@/context/cookie-consent-context";
 import { CookieConsent } from "@/components/CookieConsent";
+import { createWebSocketConnection } from "@/lib/websocket";
+import { WebSocketMessage } from "@/lib/types";
+import { pendingAgentQueries } from "@/lib/aiService";
+import { useToast } from "@/hooks/use-toast";
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -76,6 +80,86 @@ function AppRoutes() {
 }
 
 function App() {
+  const { toast } = useToast();
+  const socketRef = useRef<WebSocket | null>(null);
+  const [connected, setConnected] = useState(false);
+  
+  // Set up WebSocket connection
+  useEffect(() => {
+    // Handle WebSocket messages
+    const handleMessage = (message: WebSocketMessage) => {
+      console.log("WebSocket message received:", message);
+      
+      // Handle agent query responses
+      if (message.type === 'agent_query_completed' && message.jobId) {
+        const pendingQuery = pendingAgentQueries[message.jobId];
+        
+        if (pendingQuery) {
+          // Clear the timeout to prevent timeouts
+          clearTimeout(pendingQuery.timeout);
+          
+          // Resolve the promise with the response
+          pendingQuery.resolve(message.response);
+          
+          // Remove from pending queries
+          delete pendingAgentQueries[message.jobId];
+        }
+      }
+      
+      // Handle agent query errors
+      else if (message.type === 'agent_query_error' && message.jobId) {
+        const pendingQuery = pendingAgentQueries[message.jobId];
+        
+        if (pendingQuery) {
+          // Clear the timeout to prevent timeouts
+          clearTimeout(pendingQuery.timeout);
+          
+          // Reject the promise with the error
+          pendingQuery.reject(new Error(message.error || 'Unknown error occurred'));
+          
+          // Remove from pending queries
+          delete pendingAgentQueries[message.jobId];
+          
+          // Show error toast
+          toast({
+            title: "Agent Error",
+            description: message.error || "An error occurred with the agent query",
+            variant: "destructive",
+          });
+        }
+      }
+      
+      // You can handle other types of messages here
+    };
+    
+    // Handle successful connection
+    const handleConnect = () => {
+      setConnected(true);
+      console.log("WebSocket connected");
+    };
+    
+    // Handle disconnection
+    const handleDisconnect = () => {
+      setConnected(false);
+      console.log("WebSocket disconnected");
+    };
+    
+    // Create the WebSocket connection
+    socketRef.current = createWebSocketConnection(
+      handleMessage,
+      handleConnect,
+      handleDisconnect
+    );
+    
+    // Cleanup on unmount
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+    };
+  }, [toast]);
+  
   return (
     <CookieConsentProvider>
       <AuthProvider>

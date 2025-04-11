@@ -44,6 +44,7 @@ type Message = {
   content: string;
   sender: 'user' | 'agent';
   timestamp: Date;
+  isTyping?: boolean;
 };
 
 export default function AgentsPage() {
@@ -76,7 +77,7 @@ export default function AgentsPage() {
     queryKey: ["/api/agents"],
   });
   
-  // Query agent mutation
+  // Query agent mutation - now handles async responses
   const agentQueryMutation = useMutation({
     mutationFn: (data: { agentId: number, query: string }) => {
       return queryAgent({
@@ -85,6 +86,9 @@ export default function AgentsPage() {
       });
     },
     onSuccess: (data) => {
+      // Remove any typing indicator messages first
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
       // Add agent response to messages
       if (selectedAgent) {
         const newMessage: Message = {
@@ -98,6 +102,9 @@ export default function AgentsPage() {
       setIsLoadingResponse(false);
     },
     onError: (error) => {
+      // Remove any typing indicator messages
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
       console.error("Error querying agent:", error);
       toast({
         title: "Communication Error",
@@ -147,14 +154,40 @@ export default function AgentsPage() {
     setMessages(prev => [...prev, userMessage]);
     chatForm.reset();
     
-    // Show loading indicator
-    setIsLoadingResponse(true);
-    
-    // Send message to agent
-    agentQueryMutation.mutate({
-      agentId: selectedAgent.id, 
-      query: values.message
-    });
+    try {
+      // Show loading indicator
+      setIsLoadingResponse(true);
+      
+      // Add typing indicator message (optional)
+      setMessages(prev => [
+        ...prev, 
+        {
+          id: `typing-${Date.now()}`,
+          content: 'Agent is thinking...',
+          sender: 'agent',
+          timestamp: new Date(),
+          isTyping: true
+        }
+      ]);
+      
+      // Send message to agent asynchronously - this will immediately return a placeholder
+      // response while the actual response is processed on the server
+      agentQueryMutation.mutate({
+        agentId: selectedAgent.id, 
+        query: values.message
+      });
+      
+      // The rest of the process is handled by the WebSocket connection in App.tsx
+      // When the response is ready, it will be delivered via WebSocket
+    } catch (error) {
+      console.error("Error submitting message:", error);
+      setIsLoadingResponse(false);
+      toast({
+        title: "Message Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   // Handle opening the chat dialog
