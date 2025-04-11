@@ -63,6 +63,8 @@ export default function ProjectDetailPage() {
   const projectId = parseInt(id as string);
   const [message, setMessage] = useState("");
   const [replyingTo, setReplyingTo] = useState<{agentId: number, name: string, message: string} | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [waitingForReply, setWaitingForReply] = useState(false);
 
   // Add state for scroll position and sections
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -214,8 +216,8 @@ export default function ProjectDetailPage() {
 
   // Add mutation for replying to agent conversation
   const replyMutation = useMutation({
-    mutationFn: ({ message, targetAgentId }: { message: string, targetAgentId?: number }) => 
-      respondToConversation(projectId, message, targetAgentId),
+    mutationFn: ({ message, targetAgentId, referencedMessage }: { message: string, targetAgentId?: number, referencedMessage?: string }) => 
+      respondToConversation(projectId, message, targetAgentId, referencedMessage),
     onSuccess: () => {
       // Clear the form and reset replyingTo state
       setMessage("");
@@ -248,12 +250,54 @@ export default function ProjectDetailPage() {
     
     if (!message.trim()) return;
     
+    // Set sending animation state
+    setIsSending(true);
+    
     replyMutation.mutate({
       message,
       targetAgentId: replyingTo?.agentId,
       referencedMessage: replyingTo?.message
+    }, {
+      onSuccess: () => {
+        setIsSending(false);
+        
+        // Show simulated agent replying animation for 2-3 seconds
+        setWaitingForReply(true);
+        setTimeout(() => {
+          setWaitingForReply(false);
+        }, 2000 + Math.random() * 1000); // Random time between 2-3 seconds
+      },
+      onError: () => {
+        setIsSending(false);
+      }
     });
   };
+  
+  // Function to clear conversation history
+  const clearConversationMutation = useMutation({
+    mutationFn: () => fetch(`/api/projects/${projectId}/conversations/clear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    }).then(res => {
+      if (!res.ok) throw new Error('Failed to clear conversations');
+      return res.json();
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "conversations"] });
+      toast({
+        title: "Conversations cleared",
+        description: "All conversation history has been cleared."
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error clearing conversations",
+        description: "There was a problem clearing the conversation history.",
+        variant: "destructive"
+      });
+      console.error("Failed to clear conversations:", error);
+    }
+  });
 
   if (isLoadingProject) {
     return (
@@ -676,11 +720,29 @@ export default function ProjectDetailPage() {
             <span>Agent Communications</span>
             <Badge className="ml-2 text-xs">{conversations.length}</Badge>
           </h2>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              {openSections.conversations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </Button>
-          </CollapsibleTrigger>
+          <div className="flex items-center gap-2">
+            {conversations.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-8 px-2"
+                onClick={() => clearConversationMutation.mutate()}
+                disabled={clearConversationMutation.isPending}
+              >
+                {clearConversationMutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Trash2 className="h-3 w-3 mr-1" />
+                )}
+                Clear History
+              </Button>
+            )}
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                {openSections.conversations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+          </div>
         </div>
         <CollapsibleContent>
           {isLoadingConversations ? (
@@ -800,9 +862,13 @@ export default function ProjectDetailPage() {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
-                    disabled={!message.trim()}
+                    disabled={!message.trim() || isSending}
                   >
-                    <Send className="h-4 w-4" />
+                    {isSending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                     <span className="sr-only">Send</span>
                   </Button>
                 </div>
