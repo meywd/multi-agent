@@ -10,6 +10,7 @@ import AgentsPage from "@/pages/agents";
 import TasksPage from "@/pages/tasks";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
+import YouTubeFeatures from "@/pages/youtube-features";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { useState } from "react";
@@ -58,6 +59,7 @@ function AppRoutes() {
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/projects" component={ProjectsPage} />
         <ProtectedRoute path="/projects/:id" component={ProjectDetailPage} />
+        <ProtectedRoute path="/projects/:id/youtube-features" component={YouTubeFeatures} />
         <ProtectedRoute path="/features" component={FeaturesPage} />
         <ProtectedRoute path="/features/:id" component={FeatureDetailPage} />
         <ProtectedRoute path="/tasks/:id" component={TaskDetailPage} />
