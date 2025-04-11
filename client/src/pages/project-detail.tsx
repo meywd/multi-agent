@@ -368,9 +368,17 @@ export default function ProjectDetailPage() {
               )}
             </div>
           </div>
-          <Badge className={`text-xs sm:text-sm px-2 py-1 ${getStatusColor(project.status)}`}>
-            {formatStatus(project.status)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Link href={`/projects/${projectId}/youtube-features`}>
+              <Button size="sm" variant="outline" className="flex items-center gap-1">
+                <Layers className="h-4 w-4" />
+                <span>YouTube Features</span>
+              </Button>
+            </Link>
+            <Badge className={`text-xs sm:text-sm px-2 py-1 ${getStatusColor(project.status)}`}>
+              {formatStatus(project.status)}
+            </Badge>
+          </div>
         </div>
       </div>
 
