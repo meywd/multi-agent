@@ -66,6 +66,7 @@ function AppRoutes() {
         <ProtectedRoute path="/tasks/:id" component={TaskDetailPage} />
         <ProtectedRoute path="/agents" component={AgentsPage} />
         <ProtectedRoute path="/tasks" component={TasksPage} />
+        <ProtectedRoute path="/analytics" component={Analytics} />
         <ProtectedRoute path="/playground" component={PlaygroundPage} />
         <Route path="/auth" component={AuthPage} />
         <Route component={NotFound} />

@@ -157,7 +157,7 @@ function getDailyUsage(logs: any[]) {
 
 // Group usage by month
 function getMonthlyUsage(logs: any[]) {
-  const monthlyMap = new Map<string, { tokens: number, requests: number, cost: number }>();
+  const monthlyMap = new Map<string, { month: string, tokens: number, requests: number, cost: number }>();
   
   logs.forEach(log => {
     const date = new Date(log.timestamp);
