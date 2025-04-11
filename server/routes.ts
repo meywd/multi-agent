@@ -506,6 +506,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Assign feature to an agent
+  app.patch('/api/features/:id/assign', async (req, res) => {
+    try {
+      const featureId = parseInt(req.params.id);
+      const { assignedTo } = req.body;
+      
+      if (isNaN(featureId)) {
+        return res.status(400).json({ message: 'Invalid feature ID' });
+      }
+      
+      // Validate assignedTo is a number or null
+      if (assignedTo !== null && (isNaN(parseInt(assignedTo)) || parseInt(assignedTo) <= 0)) {
+        return res.status(400).json({ message: 'Invalid agent ID' });
+      }
+      
+      // Get the feature
+      const feature = await storage.getTask(featureId);
+      
+      if (!feature) {
+        return res.status(404).json({ message: 'Feature not found' });
+      }
+      
+      if (!feature.isFeature) {
+        return res.status(400).json({ message: 'Task is not a feature' });
+      }
+      
+      // Update the feature
+      const updatedFeature = await storage.updateTask(featureId, {
+        assignedTo: assignedTo === null ? null : parseInt(assignedTo),
+      });
+      
+      res.json(updatedFeature);
+      
+      // Broadcast feature update to all clients
+      broadcastMessage(wss, { 
+        type: 'feature_updated', 
+        task: updatedFeature 
+      });
+    } catch (error) {
+      console.error("Error assigning feature:", error);
+      res.status(500).json({ message: "Failed to assign feature to agent" });
+    }
+  });
+  
   // Subtask endpoints
   app.get('/api/tasks/:id/subtasks', async (req, res) => {
     try {

@@ -43,6 +43,7 @@ export interface IStorage {
   getTasksByStatus(status: string): Promise<Task[]>;
   getTasksByAgent(agentId: number): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
+  updateTask(id: number, updates: Partial<Task>): Promise<Task | undefined>;
   updateTaskStatus(id: number, status: string, progress?: number): Promise<Task | undefined>;
   updateTaskProgress(id: number, progress: number): Promise<Task | undefined>;
   
@@ -433,6 +434,20 @@ export class MemStorage implements IStorage {
     return updatedTask;
   }
 
+  async updateTask(id: number, updates: Partial<Task>): Promise<Task | undefined> {
+    const task = this.tasks.get(id);
+    if (!task) return undefined;
+    
+    const updatedAt = new Date();
+    const updatedTask = { 
+      ...task, 
+      ...updates,
+      updatedAt 
+    };
+    this.tasks.set(id, updatedTask);
+    return updatedTask;
+  }
+  
   async updateTaskProgress(id: number, progress: number): Promise<Task | undefined> {
     const task = this.tasks.get(id);
     if (!task) return undefined;

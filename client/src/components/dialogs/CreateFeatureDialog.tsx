@@ -59,8 +59,8 @@ export function CreateFeatureDialog({
       description: "",
       priority: "medium",
       status: "todo",
-      projectId: projectId,
-      agentId: agentId,
+      projectId: projectId || null,
+      assignedTo: agentId || null,
       isFeature: true,
     },
   });

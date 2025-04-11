@@ -70,7 +70,7 @@ export function LinkFeatureDialog({
   const linkFeatureMutation = useMutation({
     mutationFn: async (data: { featureId: number, agentId: number }) => {
       return apiRequest("PATCH", `/api/features/${data.featureId}/assign`, { 
-        agentId: data.agentId 
+        assignedTo: data.agentId 
       });
     },
     onSuccess: () => {
