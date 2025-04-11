@@ -90,46 +90,91 @@ function App() {
     const handleMessage = (message: WebSocketMessage) => {
       console.log("WebSocket message received:", message);
       
-      // Handle agent query responses
-      if (message.type === 'agent_query_completed' && message.jobId) {
-        const pendingQuery = pendingAgentQueries[message.jobId];
-        
-        if (pendingQuery) {
-          // Clear the timeout to prevent timeouts
-          clearTimeout(pendingQuery.timeout);
-          
-          // Resolve the promise with the response
-          pendingQuery.resolve(message.response);
-          
-          // Remove from pending queries
-          delete pendingAgentQueries[message.jobId];
-        }
+      // Handle different message types
+      switch(message.type) {
+        case 'agent_query_completed':
+          handleAgentQueryCompleted(message);
+          break;
+        case 'agent_query_error':
+          handleAgentQueryError(message);
+          break;
+        case 'agent_query_processing':
+          console.log("Agent query processing:", message.jobId);
+          break;
+        case 'log_created':
+          // You could handle new logs here
+          break;
+        case 'issue_created':
+        case 'issue_updated':
+          // You could handle issue updates here
+          break;
+        case 'project_created':
+        case 'project_updated':
+          // You could handle project updates here
+          break;
+        case 'task_created':
+        case 'task_updated':
+          // You could handle task updates here
+          break;
+        case 'agent_created':
+        case 'agent_updated':
+          // You could handle agent updates here
+          break;
+        case 'initial_data':
+          console.log("Received initial data from WebSocket");
+          break;
       }
+    };
+    
+    // Handle agent query completed message
+    const handleAgentQueryCompleted = (message: { jobId: string, response: string }) => {
+      if (!message.jobId) return;
       
-      // Handle agent query errors
-      else if (message.type === 'agent_query_error' && message.jobId) {
-        const pendingQuery = pendingAgentQueries[message.jobId];
+      const pendingQuery = pendingAgentQueries[message.jobId];
+      
+      if (pendingQuery) {
+        // Clear the timeout to prevent timeouts
+        clearTimeout(pendingQuery.timeout);
         
-        if (pendingQuery) {
-          // Clear the timeout to prevent timeouts
-          clearTimeout(pendingQuery.timeout);
-          
-          // Reject the promise with the error
-          pendingQuery.reject(new Error(message.error || 'Unknown error occurred'));
-          
-          // Remove from pending queries
-          delete pendingAgentQueries[message.jobId];
-          
-          // Show error toast
-          toast({
-            title: "Agent Error",
-            description: message.error || "An error occurred with the agent query",
-            variant: "destructive",
-          });
-        }
+        // Resolve the promise with the response
+        pendingQuery.resolve(message.response);
+        
+        // Remove from pending queries
+        delete pendingAgentQueries[message.jobId];
+        
+        console.log(`Resolved agent query: ${message.jobId}`);
+      } else {
+        console.log(`No pending query found for jobId: ${message.jobId}`);
       }
+    };
+    
+    // Handle agent query error message
+    const handleAgentQueryError = (message: { jobId: string, error: string }) => {
+      if (!message.jobId) return;
       
-      // You can handle other types of messages here
+      const pendingQuery = pendingAgentQueries[message.jobId];
+      
+      if (pendingQuery) {
+        // Clear the timeout to prevent timeouts
+        clearTimeout(pendingQuery.timeout);
+        
+        // Reject the promise with the error
+        pendingQuery.reject(new Error(message.error || 'Unknown error occurred'));
+        
+        // Remove from pending queries
+        delete pendingAgentQueries[message.jobId];
+        
+        // Show error toast
+        toast({
+          title: "Agent Error",
+          description: message.error || "An error occurred with the agent query",
+          variant: "destructive",
+        });
+        
+        console.log(`Rejected agent query: ${message.jobId} with error: ${message.error}`);
+      } else {
+        console.log(`No pending query found for error jobId: ${message.jobId}`);
+      }
     };
     
     // Handle successful connection

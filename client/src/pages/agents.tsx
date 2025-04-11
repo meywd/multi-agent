@@ -469,16 +469,23 @@ export default function AgentsPage() {
                     message.sender === 'user' 
                       ? 'bg-primary text-primary-foreground ml-auto' 
                       : 'bg-muted text-muted-foreground mr-auto'
-                  }`}
+                  } ${message.isTyping ? 'animate-pulse' : ''}`}
                 >
                   {message.content}
+                  {message.isTyping && (
+                    <span className="inline-flex ml-1">
+                      <span className="animate-bounce">.</span>
+                      <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>.</span>
+                      <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>.</span>
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-1">
                   {message.timestamp.toLocaleTimeString()}
                 </div>
               </div>
             ))}
-            {isLoadingResponse && (
+            {isLoadingResponse && !messages.some(m => m.isTyping) && (
               <div className="text-left mb-3">
                 <div className="inline-block p-3 rounded-lg text-xs sm:text-sm bg-muted text-muted-foreground animate-pulse">
                   Agent is typing...
