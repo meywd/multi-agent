@@ -737,19 +737,17 @@ export default function ProjectDetailPage() {
                           <p>{log.message}</p>
                         </div>
                         
-                        {!log.agentId && (
-                          <div className="mt-1 text-right">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleReply(log.targetAgentId || 1, getAgentName(log.targetAgentId))}
-                              className="text-xs h-7 gap-1"
-                            >
-                              <Reply className="h-3 w-3" />
-                              Reply
-                            </Button>
-                          </div>
-                        )}
+                        <div className="mt-1 text-right">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleReply(1, "Orchestrator")}
+                            className="text-xs h-7 gap-1"
+                          >
+                            <Reply className="h-3 w-3" />
+                            Reply
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
