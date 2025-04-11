@@ -1364,7 +1364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Broadcast the new log
       broadcastMessage(wss, { type: 'log_created', log: responseLog });
       
-      // Instead of relying on the queue, we'll create an immediate agent response
+      // Create an immediate agent response and queue the full processing
       try {
         console.log(`Processing message in project ${projectId}`);
         
@@ -1389,6 +1389,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Broadcast the new agent response log
         broadcastMessage(wss, { type: 'log_created', log: agentResponseLog });
+        
+        // Queue the main message processing to happen asynchronously
+        // This will allow the agent to continue working after sending its initial response
+        await queueAgentMessage({
+          message: message,
+          agentId: null, // From user
+          projectId: projectId,
+          targetAgentId: agentId || null
+        });
+        
+        console.log(`Message queued for full processing by agent #${agentId || 1}`);
         
       } catch (responseError) {
         console.error('Error creating agent response:', responseError);
