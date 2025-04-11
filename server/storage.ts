@@ -19,7 +19,7 @@ import {
   projects
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, ne, sql, desc, asc, isNull, gt, count } from "drizzle-orm";
+import { eq, and, ne, sql, desc, asc, isNull, gt, count, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -291,7 +291,7 @@ export class MemStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.username.toLowerCase() === username.toLowerCase(),
     );
   }
   
@@ -719,7 +719,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    // Use case-insensitive comparison with ilike
+    const [user] = await db.select().from(users).where(sql`LOWER(${users.username}) = LOWER(${username})`);
     return user || undefined;
   }
   
