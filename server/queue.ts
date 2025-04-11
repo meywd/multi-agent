@@ -4,19 +4,15 @@ import { storage } from './storage';
 import { getAgentResponse } from './openai';
 import { extractTasksFromResponse } from './routes';
 
-// Redis connection is automatically handled by Bull
-// Use default Redis configuration or environment variables if available
+// For simplicity in development, use in-memory queue processing
+// This will allow the queue to work without an external Redis instance
 const messageQueue = new Queue('agent-messages', {
-  redis: process.env.REDIS_URL || {
-    port: 6379,
-    host: '127.0.0.1'
-  }
+  // Default to in-memory processing if REDIS_URL is not available
+  redis: process.env.REDIS_URL ? process.env.REDIS_URL : undefined
 });
 const taskQueue = new Queue('task-processing', {
-  redis: process.env.REDIS_URL || {
-    port: 6379,
-    host: '127.0.0.1'
-  }
+  // Default to in-memory processing if REDIS_URL is not available
+  redis: process.env.REDIS_URL ? process.env.REDIS_URL : undefined
 });
 
 // Reference to the WebSocket server for sending updates
