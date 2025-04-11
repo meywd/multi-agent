@@ -1314,7 +1314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/projects/:id/respond', async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const { message, agentId } = req.body;
+      const { message, agentId, referencedMessage } = req.body;
       
       if (!message) {
         return res.status(400).json({ message: 'Message is required' });
@@ -1333,7 +1333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId,
         type: 'conversation',
         message,
-        details: null
+        details: referencedMessage ? `In reply to: "${referencedMessage}"` : null
       });
       
       // Broadcast the new log
@@ -1343,14 +1343,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         console.log(`Processing message in project ${projectId}`);
         
-        // Create an immediate response from the Orchestrator agent
+        let responseMessage = `I've received your message: "${message}".`;
+        
+        // Add context of the referenced message if available
+        if (referencedMessage) {
+          responseMessage += ` I understand you're referring to "${referencedMessage.substring(0, 50)}${referencedMessage.length > 50 ? '...' : ''}". I'll address this specifically.`;
+        }
+        
+        responseMessage += " I'll start working on this right away.";
+        
+        // Create an immediate response from the target agent or default to Orchestrator
         const agentResponseLog = await storage.createLog({
-          agentId: 1, // Orchestrator agent ID
+          agentId: agentId || 1, // Target agent ID or default to Orchestrator
           targetAgentId: null,
           projectId,
           type: 'conversation',
-          message: `I've received your message: "${message}". I'll start working on this right away.`,
-          details: "Automatic response from the Orchestrator agent"
+          message: responseMessage,
+          details: "Automatic response from the agent"
         });
         
         // Broadcast the new agent response log

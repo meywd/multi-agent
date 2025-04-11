@@ -62,7 +62,7 @@ export default function ProjectDetailPage() {
   const queryClient = useQueryClient();
   const projectId = parseInt(id as string);
   const [message, setMessage] = useState("");
-  const [replyingTo, setReplyingTo] = useState<{agentId: number, name: string} | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{agentId: number, name: string, message: string} | null>(null);
 
   // Add state for scroll position and sections
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -239,8 +239,8 @@ export default function ProjectDetailPage() {
     }
   });
 
-  const handleReply = (agentId: number, agentName: string) => {
-    setReplyingTo({ agentId, name: agentName });
+  const handleReply = (agentId: number, agentName: string, messageContent: string) => {
+    setReplyingTo({ agentId, name: agentName, message: messageContent });
   };
 
   const handleSendMessage = (event: React.FormEvent) => {
@@ -250,7 +250,8 @@ export default function ProjectDetailPage() {
     
     replyMutation.mutate({
       message,
-      targetAgentId: replyingTo?.agentId
+      targetAgentId: replyingTo?.agentId,
+      referencedMessage: replyingTo?.message
     });
   };
 
@@ -741,7 +742,11 @@ export default function ProjectDetailPage() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => handleReply(1, "Orchestrator")}
+                            onClick={() => handleReply(
+                              log.agentId || 1, 
+                              getAgentName(log.agentId) || "Orchestrator",
+                              log.message
+                            )}
                             className="text-xs h-7 gap-1"
                           >
                             <Reply className="h-3 w-3" />
@@ -760,18 +765,23 @@ export default function ProjectDetailPage() {
             <form onSubmit={handleSendMessage} className="flex flex-col space-y-2">
               <div className="rounded-lg bg-muted p-2">
                 {replyingTo && (
-                  <div className="mb-2 flex items-center px-3 py-1 bg-background rounded text-xs text-muted-foreground">
-                    <span>Replying to {replyingTo.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="ml-auto h-auto p-0 text-muted-foreground"
-                      onClick={() => setReplyingTo(null)}
-                    >
-                      <X className="h-3 w-3" />
-                      <span className="sr-only">Cancel reply</span>
-                    </Button>
+                  <div className="mb-2 flex flex-col bg-background rounded text-xs">
+                    <div className="flex items-center px-3 py-1 text-muted-foreground border-b border-muted">
+                      <span>Replying to {replyingTo.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto h-auto p-0 text-muted-foreground"
+                        onClick={() => setReplyingTo(null)}
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Cancel reply</span>
+                      </Button>
+                    </div>
+                    <div className="px-3 py-2 text-muted-foreground italic line-clamp-2">
+                      "{replyingTo.message}"
+                    </div>
                   </div>
                 )}
                 <div className="relative">

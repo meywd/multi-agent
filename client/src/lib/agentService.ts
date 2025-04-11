@@ -251,14 +251,16 @@ export async function getProjectConversations(projectId: number): Promise<Log[]>
 export async function respondToConversation(
   projectId: number, 
   message: string, 
-  targetAgentId?: number
+  targetAgentId?: number,
+  referencedMessage?: string
 ): Promise<Log> {
   return await apiRequest({
     method: "POST",
     url: `/api/projects/${projectId}/respond`,
     body: { 
       message,
-      agentId: targetAgentId 
+      agentId: targetAgentId,
+      referencedMessage
     }
   });
 }
