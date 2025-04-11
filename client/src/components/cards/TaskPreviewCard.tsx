@@ -1,146 +1,113 @@
 import React from 'react';
-import { Link } from 'wouter';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { CheckCircle2, Clock, AlertCircle, Code, Cpu } from "lucide-react";
+import { Task } from '@shared/schema';
+import { cn } from '@/lib/utils';
 
-// Define the task data structure
-interface TaskPreviewProps {
-  id: number;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  progress: number | null;
-  assignedTo?: number | null;
-  isFeature?: boolean;
-  agentName?: string;
+interface TaskPreviewCardProps {
+  task: Task;
+  onClick?: (task: Task) => void;
   className?: string;
-  onClick?: () => void;
 }
 
-// Helper utilities for status and priority colors
-const statusColors: Record<string, string> = {
-  'todo': 'bg-gray-200 text-gray-800',
-  'in_progress': 'bg-blue-100 text-blue-800',
-  'review': 'bg-yellow-100 text-yellow-800',
-  'done': 'bg-green-100 text-green-800',
-  'blocked': 'bg-red-100 text-red-800',
-};
+export function TaskPreviewCard({ task, onClick, className }: TaskPreviewCardProps) {
+  // Helper to get status icon and color
+  const getStatusDetails = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return { icon: <CheckCircle2 className="h-4 w-4 text-green-500" />, color: 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900' };
+      case 'in_progress':
+        return { icon: <Cpu className="h-4 w-4 text-blue-500 animate-pulse" />, color: 'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900' };
+      case 'queued':
+        return { icon: <Clock className="h-4 w-4 text-amber-500" />, color: 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900' };
+      case 'debugging':
+        return { icon: <Code className="h-4 w-4 text-purple-500" />, color: 'bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-900' };
+      case 'failed':
+        return { icon: <AlertCircle className="h-4 w-4 text-red-500" />, color: 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900' };
+      default:
+        return { icon: <Clock className="h-4 w-4 text-gray-500" />, color: 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700' };
+    }
+  };
 
-const priorityColors: Record<string, string> = {
-  'low': 'bg-gray-100 text-gray-800',
-  'medium': 'bg-blue-100 text-blue-800',
-  'high': 'bg-orange-100 text-orange-800',
-  'critical': 'bg-red-100 text-red-800',
-};
+  // Get status details
+  const statusDetails = getStatusDetails(task.status);
 
-export function TaskPreviewCard({
-  id,
-  title,
-  description,
-  status,
-  priority,
-  progress = 0,
-  assignedTo,
-  isFeature = false,
-  agentName,
-  className = '',
-  onClick
-}: TaskPreviewProps) {
-  // Format the status and priority for display
-  const displayStatus = status.replace('_', ' ');
-  const displayPriority = priority.charAt(0).toUpperCase() + priority.slice(1);
-  
-  // Generate the status badge color based on status
-  const statusColor = statusColors[status] || 'bg-gray-500';
-  const priorityColor = priorityColors[priority] || 'bg-gray-500';
-  
-  // Helper to truncate text
-  const truncate = (text: string, length: number) => {
-    if (!text) return '';
-    return text.length > length ? text.substring(0, length) + '...' : text;
+  // Get priority color
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'high':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+      case 'medium':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'low':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    }
+  };
+
+  const handleClick = () => {
+    if (onClick) {
+      onClick(task);
+    }
   };
 
   return (
     <Card 
-      className={`w-full border shadow-sm hover:shadow-md transition-shadow ${className}`}
-      onClick={onClick}
+      className={cn(
+        "h-full border transition-all hover:shadow-md cursor-pointer", 
+        statusDetails.color,
+        className
+      )}
+      onClick={handleClick}
     >
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <CardTitle className="text-lg font-semibold line-clamp-1">
-            {isFeature ? '✨ ' : ''}{title}
+          <CardTitle className="text-sm font-medium line-clamp-2">
+            {task.title}
           </CardTitle>
-          <Badge 
-            variant="secondary"
-            className={`ml-2 flex-shrink-0 ${statusColor}`}
-          >
-            {displayStatus}
-          </Badge>
-        </div>
-        <CardDescription className="line-clamp-2 mt-1">
-          {description || 'No description available'}
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="pb-2">
-        <div className="flex flex-col space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">Progress</span>
-            <span className="text-xs font-medium">{progress || 0}%</span>
+          <div className="flex items-center space-x-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>{statusDetails.icon}</div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="capitalize">{task.status}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-          <Progress value={progress || 0} className="h-2" />
         </div>
+      </CardHeader>
+      <CardContent className="pb-2">
+        <p className="text-xs text-muted-foreground line-clamp-3">
+          {task.description || "No description provided"}
+        </p>
       </CardContent>
-      
       <CardFooter className="pt-0 flex justify-between items-center">
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline" className={`${priorityColor} text-xs`}>
-            {displayPriority}
-          </Badge>
-          {isFeature && (
-            <Badge variant="outline" className="bg-purple-100 text-xs">
-              Feature
-            </Badge>
-          )}
-        </div>
-        
-        {assignedTo && (
+        <Badge variant="outline" className={cn(
+          "text-xs px-2 py-0.5 rounded-sm font-medium capitalize",
+          getPriorityColor(task.priority)
+        )}>
+          {task.priority}
+        </Badge>
+        {task.progress > 0 && (
           <div className="flex items-center">
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                {agentName ? agentName.charAt(0).toUpperCase() : 'A'}
-              </AvatarFallback>
-            </Avatar>
+            <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700">
+              <div 
+                className="h-full bg-blue-600 dark:bg-blue-400" 
+                style={{ width: `${task.progress}%` }}
+              />
+            </div>
+            <span className="ml-1.5 text-xs text-muted-foreground">{task.progress}%</span>
           </div>
         )}
       </CardFooter>
     </Card>
-  );
-}
-
-export function FeaturePreviewCard(props: TaskPreviewProps) {
-  return (
-    <TaskPreviewCard {...props} isFeature={true} />
-  );
-}
-
-// Connected card that links to the task detail page
-export function LinkedTaskPreviewCard(props: TaskPreviewProps) {
-  return (
-    <Link href={`/tasks/${props.id}`}>
-      <TaskPreviewCard {...props} />
-    </Link>
-  );
-}
-
-// Connected card that links to the feature detail page
-export function LinkedFeaturePreviewCard(props: TaskPreviewProps) {
-  return (
-    <Link href={`/features/${props.id}`}>
-      <FeaturePreviewCard {...props} />
-    </Link>
   );
 }
