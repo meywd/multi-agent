@@ -107,11 +107,17 @@ export async function extractTasksFromResponse(response: string, projectId: numb
   status?: string;
   estimatedTime?: number;
   assignedTo?: number;
+  isFeature?: boolean;
+  parentId?: number;
+  projectId: number;
 }>> {
   try {
+    console.log("Attempting to extract tasks from response for project ID:", projectId);
+    console.log("Response excerpt:", response.substring(0, 200) + "...");
+    
     // Use OpenAI client to parse the text into structured tasks
     const parsedResponse = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
           role: "system",
@@ -126,6 +132,10 @@ export async function extractTasksFromResponse(response: string, projectId: numb
           - assignedTo (optional): Agent ID number to assign the task to (1=Orchestrator, 2=Builder, 3=Debugger, 4=Verifier, 5=UX Designer)
           - isFeature (optional): Boolean value indicating whether this is a feature (higher-level item) rather than a regular task. Set to true for major features.
           - parentId (optional): The ID of the parent task or feature that this task belongs to, if applicable
+          
+          If the text describes tasks or features in a way that can be broken down into separate work items, extract them.
+          
+          Always look for tasks even if they aren't explicitly labeled as "tasks" - they might be described as steps, requirements, features, stories, or components.
           
           The system will automatically add the current projectId to each task/feature.
           
@@ -148,10 +158,12 @@ export async function extractTasksFromResponse(response: string, projectId: numb
                 "status": "todo",
                 "estimatedTime": 2,
                 "assignedTo": 2,
-                "parentId": 1
+                "parentId": null
               }
             ]
           }
+          
+          If you don't find any tasks or features in the text, return an empty array: { "tasks": [] }
           
           Respond with this JSON structure only, without any additional text.`
         },
@@ -161,10 +173,11 @@ export async function extractTasksFromResponse(response: string, projectId: numb
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.1
+      temperature: 0.2
     });
     
     if (!parsedResponse.choices[0].message.content) {
+      console.log("No content in parsed response");
       return [];
     }
     
@@ -175,6 +188,8 @@ export async function extractTasksFromResponse(response: string, projectId: numb
       console.log("Parsed task content:", JSON.stringify(parsedContent, null, 2));
       
       if (Array.isArray(parsedContent.tasks)) {
+        console.log(`Extracted ${parsedContent.tasks.length} tasks from response`);
+        
         return parsedContent.tasks.map((task: { 
           title: string, 
           description?: string, 
@@ -209,17 +224,53 @@ export async function extractTasksFromResponse(response: string, projectId: numb
             projectId
           };
         });
-      } else {
+      } else if (Array.isArray(parsedContent)) {
         // Handle case where the response has tasks directly at the root
-        return Array.isArray(parsedContent) ? parsedContent.map(task => ({
+        console.log(`Extracted ${parsedContent.length} tasks from direct root array`);
+        
+        return parsedContent.map((task: any) => ({
           ...task,
+          title: task.title || "Untitled Task",
+          description: task.description || null,
+          priority: task.priority || "medium",
+          status: task.status || "todo",
+          estimatedTime: task.estimatedTime || null,
+          assignedTo: task.assignedTo || null,
           isFeature: task.isFeature || false,
           parentId: task.parentId || null,
           projectId
-        })) : [];
+        }));
+      } else {
+        console.log("No tasks found in parsed content");
+        return [];
       }
     } catch (error) {
       console.error("Error parsing task JSON:", error);
+      // Try a more aggressive approach to extract any JSON from the response
+      try {
+        // Look for any JSON structure in the content
+        const jsonMatch = parsedResponse.choices[0].message.content.match(/(\{[\s\S]*\})/);
+        if (jsonMatch && jsonMatch[1]) {
+          const extractedJson = JSON.parse(jsonMatch[1]);
+          console.log("Extracted JSON using regex:", extractedJson);
+          
+          if (extractedJson.tasks && Array.isArray(extractedJson.tasks)) {
+            return extractedJson.tasks.map((task: any) => ({
+              title: task.title,
+              description: task.description || null,
+              priority: task.priority || "medium",
+              status: task.status || "todo",
+              estimatedTime: task.estimatedTime || null,
+              assignedTo: task.assignedTo || null,
+              isFeature: task.isFeature || false,
+              parentId: task.parentId || null,
+              projectId
+            }));
+          }
+        }
+      } catch (fallbackError) {
+        console.error("Fallback JSON extraction failed:", fallbackError);
+      }
       return [];
     }
   } catch (error) {

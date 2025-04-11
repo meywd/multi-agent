@@ -165,8 +165,7 @@ messageQueue.process('process-message', async (job) => {
       .join('\n\n');
     
     // Check if the message is asking to create tasks or features
-    const createTasksRequestRegex = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?|plan\s+tasks?|break\s+down|divide\s+into\s+tasks?|what\s+tasks|identify\s+tasks?|create\s+features?|add\s+features?|make\s+features?|start\s+features?|plan\s+features?|what\s+features|identify\s+features?/i;
-    const isRequestingTasks = createTasksRequestRegex.test(message.toLowerCase());
+    const userMessageRequestsTaskCreation = /create\s+tasks?|add\s+tasks?|make\s+tasks?|start\s+tasks?|plan\s+tasks?|break\s+down|divide\s+into\s+tasks?|what\s+tasks|identify\s+tasks?|create\s+features?|add\s+features?|make\s+features?|start\s+features?|plan\s+features?|what\s+features|identify\s+features?/i.test(message.toLowerCase());
     
     // Generate an agent response based on the message
     const response = await getAgentResponse(agent, message, {
@@ -189,15 +188,14 @@ messageQueue.process('process-message', async (job) => {
     // Broadcast the new log
     broadcastMessage({ type: 'log_created', log: agentResponseLog });
     
-    // Check if the response appears to contain tasks or features
-    const responseContainsTasks = /task\s+\d+|tasks?:|\btask\b.*?:|here are the tasks|list of tasks|following tasks|we'll need to|steps to implement|break this down into|implementation steps|features?:|\bfeature\b.*?:|here are the features|list of features|following features/i.test(response);
+    // Check if the response appears to contain tasks or features 
+    // This regex pattern is more comprehensive to detect various ways tasks might be described
+    const responseContainsTasks = /task\s+\d+|tasks?:|\btask\b.*?:|here are the tasks|list of tasks|following tasks|we'll need to|steps to implement|break this down into|implementation steps|features?:|\bfeature\b.*?:|here are the features|list of features|following features|step\s+\d+|steps?:|\bstep\b.*?:|here are the steps|components?:|\bcomponent\b.*?:|requirements?:|\brequirement\b.*?:|stories?:|\bstory\b.*?:|work items?:|\bitem\b.*?:/i.test(response);
     
-    // We'll extract tasks if:
-    // 1. User explicitly asked for tasks creation, or
-    // 2. The agent's response appears to contain task descriptions
-    const shouldExtractTasks = isRequestingTasks || responseContainsTasks;
+    // Always attempt to extract tasks
+    const shouldExtractTasks = true;
     
-    console.log(`Task extraction check: requestingTasks=${isRequestingTasks}, responseTasks=${responseContainsTasks}, shouldExtract=${shouldExtractTasks}`);
+    console.log(`Task extraction check: userRequesting=${userMessageRequestsTaskCreation}, responseTasks=${responseContainsTasks}, shouldExtract=${shouldExtractTasks}`);
     
     // If the message or response contains task descriptions, extract them
     if (shouldExtractTasks) {
@@ -207,29 +205,48 @@ messageQueue.process('process-message', async (job) => {
         
         // Create the tasks
         for (const taskInfo of taskExtraction) {
-          const task = await storage.createTask({
-            ...taskInfo,
-            projectId
-          });
+          console.log(`Creating task from extraction: ${JSON.stringify(taskInfo)}`);
           
-          // Create a log about task creation
-          await storage.createLog({
-            agentId: agent.id,
-            projectId,
-            type: 'info',
-            message: `Created task: ${task.title}`,
-            details: task.description
-          });
-          
-          // Broadcast task creation
-          broadcastMessage({ type: 'task_created', task });
-          
-          // If task is assigned to an agent, queue it for processing
-          if (task.assignedTo) {
-            await queueTaskProcessing({
-              taskId: task.id,
-              agentId: task.assignedTo
+          try {
+            // Check if this is a feature or regular task
+            let task;
+            if (taskInfo.isFeature) {
+              console.log(`Creating FEATURE task: ${taskInfo.title}`);
+              task = await storage.createFeature({
+                ...taskInfo,
+                projectId
+              });
+            } else {
+              console.log(`Creating regular task: ${taskInfo.title}`);
+              task = await storage.createTask({
+                ...taskInfo,
+                projectId
+              });
+            }
+            
+            // Create a log about task creation
+            const taskLog = await storage.createLog({
+              agentId: agent.id,
+              projectId,
+              type: 'info',
+              message: `Created ${taskInfo.isFeature ? 'feature' : 'task'}: ${task.title}`,
+              details: task.description
             });
+            
+            // Broadcast task and log creation
+            broadcastMessage({ type: taskInfo.isFeature ? 'feature_created' : 'task_created', task });
+            broadcastMessage({ type: 'log_created', log: taskLog });
+            
+            // If task is assigned to an agent, queue it for processing
+            if (task.assignedTo) {
+              console.log(`Task #${task.id} assigned to agent #${task.assignedTo}, queueing for processing`);
+              await queueTaskProcessing({
+                taskId: task.id,
+                agentId: task.assignedTo
+              });
+            }
+          } catch (taskError) {
+            console.error(`Error creating task ${taskInfo.title}:`, taskError);
           }
         }
         

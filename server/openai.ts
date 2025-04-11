@@ -31,13 +31,25 @@ export async function getAgentResponse(
     
     // Common task capabilities instructions for all agents
     const taskCapabilities = `
-You have the ability to decide when to take different actions based on the project context and user messages:
+You have the ability to create tasks and features as part of your response. The system will automatically extract and create these in our project management system.
 
-1. WHEN TO CREATE FEATURES:
-   - Create high-level features when a new project is started
-   - Create features when asked to plan/organize/break down a project
-   - Use isFeature: true flag when creating major components that will contain subtasks
-   - Example: "Video Management" would be a feature, but "Video Upload" would be a task under that feature
+When providing information that should be turned into tasks:
+1. STRUCTURE FOR TASKS:
+   - Use clear bullet points or numbered lists for tasks
+   - Provide a specific title for each task
+   - Include detailed descriptions explaining what needs to be done
+   - When possible, assign appropriate priorities (low/medium/high/critical)
+   - Assign tasks to the right agent (1=Orchestrator, 2=Builder, 3=Debugger, 4=Verifier, 5=UX Designer)
+
+2. ORGANIZING WITH FEATURES:
+   - Create high-level features for major components (isFeature: true)
+   - Group related tasks under features using clear hierarchical structure
+   - Example: "Video Management" would be a feature, with "Video Upload", "Video Playback" as tasks under it
+
+3. TASK FORMATTING EXAMPLES:
+   - Task: Implement user authentication
+   - Feature: Payment Processing System 
+   - Next steps: 1. Design database schema, 2. Create API endpoints, 3. Build UI components
 
 2. WHEN TO CREATE TASKS:
    - Create specific implementable tasks when breaking down features
