@@ -16,6 +16,8 @@ import { useState } from "react";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { Toaster } from "@/components/ui/toaster";
+import { CookieConsentProvider } from "@/context/cookie-consent-context";
+import { CookieConsent } from "@/components/CookieConsent";
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -71,10 +73,13 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-      <Toaster />
-    </AuthProvider>
+    <CookieConsentProvider>
+      <AuthProvider>
+        <AppRoutes />
+        <CookieConsent />
+        <Toaster />
+      </AuthProvider>
+    </CookieConsentProvider>
   );
 }
 
