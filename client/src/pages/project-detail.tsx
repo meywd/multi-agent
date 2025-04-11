@@ -5,6 +5,7 @@ import {
   getTasksByProject, 
   getProjectConversations, 
   respondToConversation,
+  clearConversationHistory,
   getFeatures,
   getSubtasks,
   getAgents
@@ -277,13 +278,7 @@ export default function ProjectDetailPage() {
   
   // Function to clear conversation history
   const clearConversationMutation = useMutation({
-    mutationFn: () => fetch(`/api/projects/${projectId}/conversations/clear`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    }).then(res => {
-      if (!res.ok) throw new Error('Failed to clear conversations');
-      return res.json();
-    }),
+    mutationFn: () => clearConversationHistory(projectId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "conversations"] });
       toast({

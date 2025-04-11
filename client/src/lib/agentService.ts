@@ -264,3 +264,10 @@ export async function respondToConversation(
     }
   });
 }
+
+export async function clearConversationHistory(projectId: number): Promise<{success: boolean, message: string}> {
+  return await apiRequest({
+    method: "POST",
+    url: `/api/projects/${projectId}/conversations/clear`
+  });
+}
